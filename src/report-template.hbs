@@ -10,17 +10,17 @@
           font-family: Arial, Helvetica, sans-serif;
         }
 
-        .story[data-status='changed'],
-        .story[data-status='added'],
-        .story[data-status='deleted'] {
+        .component[data-status='changed'],
+        .component[data-status='added'],
+        .component[data-status='deleted'] {
           cursor: pointer;
         }
 
-        .story.status-closed .shots {
+        .component.status-closed .shots {
           display: none;
         }
 
-        .story.status-open .shots {
+        .component.status-open .shots {
           display: block;
         }
 
@@ -57,8 +57,8 @@
 
   <body>
     <ul>
-      {{#storiesDiff}}
-        <li class="story status-closed" data-status='{{status}}'>
+      {{#componentsDiff}}
+        <li class="component status-closed" data-status='{{status}}'>
           <span class="status {{status}}">{{status}}</span>
           {{id}}
           <div class="shots">
@@ -81,7 +81,7 @@
           {{/ifEquals}}
           </div>
         </li>
-      {{/storiesDiff}}
+      {{/componentsDiff}}
     </ul>
 
     <script>

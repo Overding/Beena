@@ -14,7 +14,7 @@ import { setupProcessCleanUponExit } from './utils/process.js'
 
 import * as componentExplorers from './component-explorers/index.js'
 
-type StoryDiff = {
+type ComponentDiff = {
   id: string
   status: 'ok' | 'added' | 'deleted' | 'changed'
 }
@@ -22,7 +22,11 @@ type StoryDiff = {
 const childProcesses: ChildProcessWithoutNullStreams[] = []
 setupProcessCleanUponExit(childProcesses)
 
-const componentExplorer = 'storybook'
+const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 30_000
+const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 60_000
+
+const componentExplorerType = 'storybook'
+const componentExplorer = componentExplorers[componentExplorerType]
 const baselineBranch = 'main'
 const baselineBranchHash = getGitBranchSHA1(baselineBranch)
 const featureBranch = 'feat/sample'
@@ -37,29 +41,30 @@ if (fs.existsSync(path.join(process.cwd(), screenshotsDirPath))) {
   })
 }
 
-const baselineBranchStoryIds = await screenshotStorybookByBranch(baselineBranch)
-const featureBranchStoryIds = await screenshotStorybookByBranch(featureBranch)
+const baselineBranchComponentIds =
+  await screenshotStorybookByBranch(baselineBranch)
+const featureBranchComponentIds =
+  await screenshotStorybookByBranch(featureBranch)
 createReportDirectory()
-const storiesDiff = getStoriesDiff(
-  baselineBranchStoryIds,
-  featureBranchStoryIds,
+const componentsDiff = getComponentsDiff(
+  baselineBranchComponentIds,
+  featureBranchComponentIds,
 )
-console.log({ storiesDiff })
-generateReport(storiesDiff)
+console.log({ componentsDiff })
+generateReport(componentsDiff)
 process.exit()
 
 async function screenshotStorybookByBranch(branch: string): Promise<string[]> {
   checkoutGitBranch(branch)
-  console.log(`Starting up the component explorer (${componentExplorer})… `)
-  const { port, childProcess } =
-    await componentExplorers[componentExplorer].run()
+  console.log(`Starting up the component explorer (${componentExplorerType})… `)
+  const { port, childProcess } = await componentExplorer.run()
   childProcesses.push(childProcess)
   console.log(`Component explorer is running at http://localhost:${port}`)
   console.log(`Taking screenshots of components…`)
-  const storyIds = await takeScreenshotsOfStorybook(port, branch)
+  const ComponentIds = await takeScreenshotsOfStorybook(port, branch)
   console.log(`Took screenshots of components`)
   childProcess.kill()
-  return storyIds
+  return ComponentIds
 }
 
 function createReportDirectory() {
@@ -67,7 +72,7 @@ function createReportDirectory() {
   fs.mkdirSync(reportDiffDirPath, { recursive: true })
 }
 
-function generateReport(storiesDiff: StoryDiff[]) {
+function generateReport(componentsDiff: ComponentDiff[]) {
   const reportPath = path.join(process.cwd(), reportDirPath, `${diffId}.html`)
 
   Handlebars.registerHelper(
@@ -84,7 +89,7 @@ function generateReport(storiesDiff: StoryDiff[]) {
     diffId,
     baselineBranchHash,
     featureBranchHash,
-    storiesDiff,
+    componentsDiff,
   })
 
   fs.writeFileSync(reportPath, reportContent)
@@ -96,16 +101,16 @@ function getModuleDir() {
   return path.dirname(__filename)
 }
 
-function getStoriesDiff(
-  baselineBranchStoryIds: string[],
-  featureBranchStoryIds: string[],
-): StoryDiff[] {
-  const stroyIdsDiff = getStroyIdsDiff(
-    baselineBranchStoryIds,
-    featureBranchStoryIds,
+function getComponentsDiff(
+  baselineBranchComponentIds: string[],
+  featureBranchComponentIds: string[],
+): ComponentDiff[] {
+  const componentIdsDiff = getComponentIdsDiff(
+    baselineBranchComponentIds,
+    featureBranchComponentIds,
   )
-  for (const story of stroyIdsDiff) {
-    if (story.status !== 'ok') {
+  for (const componentIdDiff of componentIdsDiff) {
+    if (componentIdDiff.status !== 'ok') {
       continue
     }
 
@@ -113,7 +118,7 @@ function getStoriesDiff(
       process.cwd(),
       screenshotsDirPath,
       baselineBranchHash,
-      `${story.id}.png`,
+      `${componentIdDiff.id}.png`,
     )
     const baselineShotImage = PNG.sync.read(fs.readFileSync(baselineShotPath))
 
@@ -121,7 +126,7 @@ function getStoriesDiff(
       process.cwd(),
       screenshotsDirPath,
       featureBranchHash,
-      `${story.id}.png`,
+      `${componentIdDiff.id}.png`,
     )
     const featureShotImage = PNG.sync.read(fs.readFileSync(featureShotPath))
 
@@ -138,50 +143,50 @@ function getStoriesDiff(
         { threshold: 0.1 },
       )
 
-      story.status = diffNumber > 0 ? 'changed' : 'ok'
+      componentIdDiff.status = diffNumber > 0 ? 'changed' : 'ok'
 
-      if (story.status === 'changed') {
+      if (componentIdDiff.status === 'changed') {
         const diffShotPath = path.join(
           process.cwd(),
           reportDirPath,
           diffId,
-          `${story.id}.png`,
+          `${componentIdDiff.id}.png`,
         )
 
         fs.writeFileSync(diffShotPath, PNG.sync.write(diff))
       }
     } catch (e) {
-      console.log('Error for ', story.id)
+      console.log('Error for ', componentIdDiff.id)
       console.log(e)
     }
   }
-  return stroyIdsDiff
+  return componentIdsDiff
 }
 
-function getStroyIdsDiff(
-  baselineBranchStoryIds: string[],
-  featureBranchStoryIds: string[],
+function getComponentIdsDiff(
+  baselineBranchComponentIds: string[],
+  featureBranchComponentIds: string[],
 ) {
-  const baselineStoryIdsSet = new Set(baselineBranchStoryIds)
-  const featureStoryIdsSet = new Set(featureBranchStoryIds)
+  const baselineComponentIdsSet = new Set(baselineBranchComponentIds)
+  const featureComponentIdsSet = new Set(featureBranchComponentIds)
 
-  const storiesDiff: StoryDiff[] = []
+  const componentsDiff: ComponentDiff[] = []
 
-  baselineBranchStoryIds.forEach((id) => {
-    if (featureStoryIdsSet.has(id)) {
-      storiesDiff.push({ id, status: 'ok' })
+  baselineBranchComponentIds.forEach((id) => {
+    if (featureComponentIdsSet.has(id)) {
+      componentsDiff.push({ id, status: 'ok' })
     } else {
-      storiesDiff.push({ id, status: 'deleted' })
+      componentsDiff.push({ id, status: 'deleted' })
     }
   })
 
-  featureBranchStoryIds.forEach((id) => {
-    if (!baselineStoryIdsSet.has(id)) {
-      storiesDiff.push({ id, status: 'added' })
+  featureBranchComponentIds.forEach((id) => {
+    if (!baselineComponentIdsSet.has(id)) {
+      componentsDiff.push({ id, status: 'added' })
     }
   })
 
-  return storiesDiff
+  return componentsDiff
 }
 
 async function takeScreenshotsOfStorybook(port: number, branchName: string) {
@@ -191,10 +196,11 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     headless: true,
   })
   const page = await browser.newPage()
-  await page.goto(`http://localhost:${port}/`)
+  const baseURL = `http://localhost:${port}`
 
-  const componentIds =
-    await componentExplorers[componentExplorer].getComponentIdsInPage(page)
+  const componentIds = await componentExplorers[
+    componentExplorerType
+  ].getComponentIdsInPage(page, baseURL)
 
   const workersCount = Math.ceil(Math.max(os.cpus().length / 3, 1))
   const componentsPerWorker = Math.ceil(componentIds.length / workersCount)
@@ -224,7 +230,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     endIndex: number,
     _workerIndex: number,
   ) {
-    const componentPage = await browser.newPage()
+    const workerPage = await browser.newPage()
     const workerComponentIds = []
 
     const retriedComponents: Record<string, number> = {}
@@ -232,18 +238,18 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     for (let i = startIndex; i < endIndex; i++) {
       const componentId = componentIds[i]
 
-      // TODO: it can be #root in lower version of storybook
-      const rootSelector = '#storybook-root'
-
       try {
-        await componentPage.goto(
-          `http://localhost:${port}/iframe.html?viewMode=story&id=${componentId}`,
-          { waitUntil: 'networkidle', timeout: 60000 },
-        )
+        const timeout =
+          (retriedComponents[componentId] ?? 0) === 0
+            ? COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS
+            : COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS
 
-        await componentPage.waitForSelector(rootSelector, {
-          timeout: (retriedComponents[componentId] ?? 0) === 0 ? 30000 : 60000,
-        })
+        await componentExplorer.gotoComponentPage(
+          workerPage,
+          baseURL,
+          componentId,
+          timeout,
+        )
       } catch (_error) {
         if (
           !retriedComponents[componentId] ||
@@ -259,7 +265,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
           i--
           continue
         } else {
-          await componentPage.screenshot({
+          await workerPage.screenshot({
             path: path.join(
               process.cwd(),
               screenshotsDirPath,
@@ -272,37 +278,11 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
           continue
         }
       }
-      const body = await componentPage.locator('body')
-      const bodyBoundingBox = await body.boundingBox()
-      const newBrowserSize = {
-        width: Math.ceil(bodyBoundingBox.width),
-        height: Math.ceil(bodyBoundingBox.height),
-      }
-      await componentPage.setViewportSize(newBrowserSize)
 
-      await componentPage.waitForFunction<boolean, string>((rootSelector) => {
-        return (
-          document.querySelector(rootSelector).children.length > 0 &&
-          document
-            .querySelector(rootSelector)
-            .children[0].textContent.indexOf('Loading...') === -1
-        )
-      }, rootSelector)
+      await componentExplorer.fitPageSizeToComponent(workerPage)
+      await componentExplorer.waitUntilComponentIsReady(workerPage)
 
-      await componentPage.evaluate(async () => {
-        const selectors = Array.from(document.querySelectorAll('img'))
-        return await Promise.all(
-          selectors.map((img) => {
-            if (img.complete) return
-            return new Promise((resolve, reject) => {
-              img.addEventListener('load', resolve)
-              img.addEventListener('error', reject)
-            })
-          }),
-        )
-      })
-
-      await componentPage.screenshot({
+      await workerPage.screenshot({
         path: path.join(
           process.cwd(),
           screenshotsDirPath,
