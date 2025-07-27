@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ChildProcessWithoutNullStreams } from 'node:child_process'
-
+import { Command } from 'commander'
 import { chromium } from 'playwright'
 import Handlebars from 'handlebars'
 import { PNG } from 'pngjs'
@@ -19,6 +19,19 @@ type ComponentDiff = {
   status: 'ok' | 'added' | 'deleted' | 'changed'
 }
 
+const cmd = new Command()
+cmd
+  .requiredOption(
+    '-b, --baseline-branch <name>',
+    'baseline branch name such as main',
+  )
+  .requiredOption(
+    '-f, --feature-branch <name>',
+    'feature branch name such as feat/awesome-feature',
+  )
+
+cmd.parse(process.argv)
+
 const childProcesses: ChildProcessWithoutNullStreams[] = []
 setupProcessCleanUponExit(childProcesses)
 
@@ -27,9 +40,10 @@ const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 60_000
 
 const componentExplorerType = 'storybook'
 const componentExplorer = componentExplorers[componentExplorerType]
-const baselineBranch = 'main'
+
+const baselineBranch = cmd.opts().baselineBranch
 const baselineBranchHash = getGitBranchSHA1(baselineBranch)
-const featureBranch = 'feat/sample'
+const featureBranch = cmd.opts().featureBranch
 const featureBranchHash = getGitBranchSHA1(featureBranch)
 const screenshotsDirPath = './node_modules/.cache/beena/screenshots'
 const reportDirPath = './node_modules/.cache/beena/reports'

@@ -24,6 +24,7 @@
     "typescript-eslint": "^8.38.0"
   },
   "dependencies": {
+    "commander": "^14.0.0",
     "handlebars": "^4.7.8",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.54.1",
