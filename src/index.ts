@@ -2,7 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process'
+import { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import { chromium } from 'playwright'
 import Handlebars from 'handlebars'
@@ -11,7 +11,8 @@ import pixelmatch from 'pixelmatch'
 
 import { checkoutGitBranch, getGitBranchSHA1 } from './utils/git.js'
 import { setupProcessCleanUponExit } from './utils/process.js'
-import { extractPortNumberFromLog } from './utils/stdio.js'
+
+import * as componentExplorers from './component-explorers/index.js'
 
 type StoryDiff = {
   id: string
@@ -21,6 +22,7 @@ type StoryDiff = {
 const childProcesses: ChildProcessWithoutNullStreams[] = []
 setupProcessCleanUponExit(childProcesses)
 
+const componentExplorer = 'storybook'
 const baselineBranch = 'main'
 const baselineBranchHash = getGitBranchSHA1(baselineBranch)
 const featureBranch = 'feat/sample'
@@ -48,13 +50,14 @@ process.exit()
 
 async function screenshotStorybookByBranch(branch: string): Promise<string[]> {
   checkoutGitBranch(branch)
-  console.log('Building storybook')
-  const { port, childProcess } = await runStorybook()
+  console.log(`Starting up the component explorer (${componentExplorer})… `)
+  const { port, childProcess } =
+    await componentExplorers[componentExplorer].run()
   childProcesses.push(childProcess)
-  console.log(`Storybook running at http://localhost:${port}`)
-  console.log(`Taking screenshots of stories.`)
+  console.log(`Component explorer is running at http://localhost:${port}`)
+  console.log(`Taking screenshots of components…`)
   const storyIds = await takeScreenshotsOfStorybook(port, branch)
-  console.log(`Took screenshots of stories.`)
+  console.log(`Took screenshots of components`)
   childProcess.kill()
   return storyIds
 }
@@ -190,35 +193,28 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
   const page = await browser.newPage()
   await page.goto(`http://localhost:${port}/`)
 
-  await page.getByLabel('Collapse', { exact: true }).click() // newer versions of storybook
-  await page.keyboard.press('ControlOrMeta+Shift+ArrowDown') // version 6?
-
-  await page
-    .locator('[data-nodetype="story"]')
-    .first()
-    .waitFor({ state: 'attached' })
-  const storiesLinks = await page.locator('[data-nodetype="story"]')
-  const storiesLinksCount = await storiesLinks.count()
+  const componentIds =
+    await componentExplorers[componentExplorer].getComponentIdsInPage(page)
 
   const workersCount = Math.ceil(Math.max(os.cpus().length / 3, 1))
-  const storyPerWorker = Math.ceil(storiesLinksCount / workersCount)
+  const componentsPerWorker = Math.ceil(componentIds.length / workersCount)
 
   console.log(
-    `using ${workersCount} worker(s). stories per worker: ${storyPerWorker}`,
+    `using ${workersCount} worker(s). components per worker: ${componentsPerWorker}`,
   )
 
   const workerProcesses = []
   for (let workerIndex = 0; workerIndex < workersCount; workerIndex++) {
     workerProcesses.push(
       doWork(
-        workerIndex * storyPerWorker,
-        Math.min((workerIndex + 1) * storyPerWorker, storiesLinksCount),
+        workerIndex * componentsPerWorker,
+        Math.min((workerIndex + 1) * componentsPerWorker, componentIds.length),
         workerIndex,
       ),
     )
   }
 
-  const storyIds = (await Promise.all(workerProcesses)).reduce(
+  const processedComponentIds = (await Promise.all(workerProcesses)).reduce(
     (acc, current) => acc.concat(current),
     [],
   )
@@ -226,56 +222,49 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
   async function doWork(
     startIndex: number,
     endIndex: number,
-    workerIndex: number,
+    _workerIndex: number,
   ) {
-    const storyPage = await browser.newPage()
-    const workerStoryIds = []
+    const componentPage = await browser.newPage()
+    const workerComponentIds = []
 
-    const retriedStories: Record<string, number> = {}
+    const retriedComponents: Record<string, number> = {}
 
     for (let i = startIndex; i < endIndex; i++) {
-      const storyLink = await storiesLinks
-        .nth(i)
-        //TODO: difference in different versions of storybook!! a is not nested in the previous versions
-        .locator('a')
-        .first()
-        .getAttribute('href')
-
-      if (!storyLink) {
-        continue
-      }
-
-      const storyId = storyLink.split('/').pop() as string
+      const componentId = componentIds[i]
 
       // TODO: it can be #root in lower version of storybook
       const rootSelector = '#storybook-root'
 
       try {
-        await storyPage.goto(
-          `http://localhost:${port}/iframe.html?viewMode=story&id=${storyId}`,
+        await componentPage.goto(
+          `http://localhost:${port}/iframe.html?viewMode=story&id=${componentId}`,
           { waitUntil: 'networkidle', timeout: 60000 },
         )
 
-        await storyPage.waitForSelector(rootSelector, {
-          timeout: (retriedStories[storyId] ?? 0) === 0 ? 30000 : 60000,
+        await componentPage.waitForSelector(rootSelector, {
+          timeout: (retriedComponents[componentId] ?? 0) === 0 ? 30000 : 60000,
         })
       } catch (_error) {
-        if (!retriedStories[storyId] || retriedStories[storyId] < 3) {
+        if (
+          !retriedComponents[componentId] ||
+          retriedComponents[componentId] < 3
+        ) {
           console.warn(
             'will retry the ',
-            storyId,
-            `(retry count ${retriedStories[storyId] ?? 0} so far)`,
+            componentId,
+            `(retry count ${retriedComponents[componentId] ?? 0} so far)`,
           )
-          retriedStories[storyId] = (retriedStories[storyId] ?? 0) + 1
-          continue
+          retriedComponents[componentId] =
+            (retriedComponents[componentId] ?? 0) + 1
           i--
+          continue
         } else {
-          await storyPage.screenshot({
+          await componentPage.screenshot({
             path: path.join(
               process.cwd(),
               screenshotsDirPath,
               getGitBranchSHA1(branchName),
-              `${storyId}.png`,
+              `${componentId}.png`,
             ),
             fullPage: true,
             animations: 'disabled',
@@ -283,15 +272,15 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
           continue
         }
       }
-      const body = await storyPage.locator('body')
+      const body = await componentPage.locator('body')
       const bodyBoundingBox = await body.boundingBox()
       const newBrowserSize = {
         width: Math.ceil(bodyBoundingBox.width),
         height: Math.ceil(bodyBoundingBox.height),
       }
-      await storyPage.setViewportSize(newBrowserSize)
+      await componentPage.setViewportSize(newBrowserSize)
 
-      await storyPage.waitForFunction<boolean, string>((rootSelector) => {
+      await componentPage.waitForFunction<boolean, string>((rootSelector) => {
         return (
           document.querySelector(rootSelector).children.length > 0 &&
           document
@@ -300,7 +289,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         )
       }, rootSelector)
 
-      await storyPage.evaluate(async () => {
+      await componentPage.evaluate(async () => {
         const selectors = Array.from(document.querySelectorAll('img'))
         return await Promise.all(
           selectors.map((img) => {
@@ -313,21 +302,21 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         )
       })
 
-      await storyPage.screenshot({
+      await componentPage.screenshot({
         path: path.join(
           process.cwd(),
           screenshotsDirPath,
           getGitBranchSHA1(branchName),
-          `${storyId}.png`,
+          `${componentId}.png`,
         ),
         fullPage: true,
         animations: 'disabled',
       })
 
-      workerStoryIds.push(storyId)
+      workerComponentIds.push(componentId)
     }
 
-    return workerStoryIds
+    return workerComponentIds
   }
 
   await browser.close()
@@ -336,34 +325,5 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
       (Date.now() - startTime) / 60000
     } minutes to to take the screenshots for this branch`,
   )
-  return storyIds
-}
-
-async function runStorybook(): Promise<{
-  port: number
-  childProcess: ChildProcessWithoutNullStreams
-}> {
-  return new Promise((resolve, _) => {
-    const childProcess = spawn('yarn', [
-      'storybook',
-      'dev',
-      '--no-open',
-      '--disable-telemetry',
-    ])
-
-    childProcess.stdout.setEncoding('utf8')
-    childProcess.stdout.on('data', function (data) {
-      console.log(data)
-      const port = extractPortNumberFromLog(data)
-      if (port) {
-        resolve({ port, childProcess })
-      }
-    })
-
-    childProcess.stderr.setEncoding('utf8')
-    childProcess.stderr.on('data', function (_data) {
-      // TODO: Verbose mode should enable this console
-      // console.error(data);
-    })
-  })
+  return processedComponentIds
 }
