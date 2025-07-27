@@ -11,6 +11,7 @@ import pixelmatch from 'pixelmatch'
 
 import { checkoutGitBranch, getGitBranchSHA1 } from './utils/git.js'
 import { setupProcessCleanUponExit } from './utils/process.js'
+import { extractPortNumberFromLog } from './utils/stdio.js'
 
 type StoryDiff = {
   id: string
@@ -353,9 +354,9 @@ async function runStorybook(): Promise<{
     childProcess.stdout.setEncoding('utf8')
     childProcess.stdout.on('data', function (data) {
       console.log(data)
-      const port = extractPort(data)
+      const port = extractPortNumberFromLog(data)
       if (port) {
-        resolve({ port: +port, childProcess })
+        resolve({ port, childProcess })
       }
     })
 
@@ -365,15 +366,4 @@ async function runStorybook(): Promise<{
       // console.error(data);
     })
   })
-}
-
-function extractPort(input: string) {
-  const regex = /localhost:(\d+)/
-  const match = input.match(regex)
-
-  if (match) {
-    return match[1]
-  }
-
-  return null
 }
