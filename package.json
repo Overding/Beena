@@ -1,0 +1,32 @@
+{
+  "name": "beena",
+  "version": "1.0.0",
+  "private": "true",
+  "type": "module",
+  "license": "UNLICENSED",
+  "main": "sr/index.ts",
+  "bin": "./dist/index.mjs",
+  "scripts": {
+    "lint": "eslint ./src/",
+    "start": "tsx src/index.ts",
+    "build": "pkgroll"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@tsconfig/node22": "^22.0.2",
+    "@types/node": "^24.1.0",
+    "@types/pngjs": "^6.0.5",
+    "eslint": "^9.32.0",
+    "pkgroll": "^2.14.5",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.8",
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.54.1",
+    "pngjs": "^7.0.0"
+  }
+}

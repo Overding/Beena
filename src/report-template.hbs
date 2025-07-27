@@ -1,0 +1,102 @@
+<html lang='en'>
+
+  <head>
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>Regvis Report</title>
+
+    <style>
+        body {
+          font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .story[data-status='changed'],
+        .story[data-status='added'],
+        .story[data-status='deleted'] {
+          cursor: pointer;
+        }
+
+        .story.status-closed .shots {
+          display: none;
+        }
+
+        .story.status-open .shots {
+          display: block;
+        }
+
+        .status {
+          display: inline-block;
+          text-transform: uppercase;
+          padding: .2em .7em;
+          font-size: .8em;
+          margin-right: 1em;
+          border-radius: 5px;
+        }
+
+       .status.ok {
+        background-color: gray;
+        color: #ffffff;
+       }
+
+        .status.deleted {
+        background-color: red;
+        color: #fff;
+       }
+
+        .status.added {
+          background-color: green;
+          color: #fff;
+        }
+
+        .status.changed {
+        background-color: rgb(179, 0, 111);
+        color: #fff;
+       }
+    </style>
+  </head>
+
+  <body>
+    <ul>
+      {{#storiesDiff}}
+        <li class="story status-closed" data-status='{{status}}'>
+          <span class="status {{status}}">{{status}}</span>
+          {{id}}
+          <div class="shots">
+          {{#ifEquals status 'ok'}}
+            <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
+          {{/ifEquals}}
+
+          {{#ifEquals status 'added'}}
+            <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
+          {{/ifEquals}}
+
+          {{#ifEquals status 'deleted'}}
+            <img src='../screenshots/{{../baselineBranchHash}}/{{id}}.png' />
+          {{/ifEquals}}
+
+           {{#ifEquals status 'changed'}}
+            <img src='../screenshots/{{../baselineBranchHash}}/{{id}}.png' />
+            <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
+            <img src='./{{../diffId}}/{{id}}.png' />
+          {{/ifEquals}}
+          </div>
+        </li>
+      {{/storiesDiff}}
+    </ul>
+
+    <script>
+      const listItems  = document.querySelectorAll('li')
+      for(listitem of listItems) {
+        listitem.addEventListener('click', e => {
+          if(e.target.classList.contains('status-closed')) {
+            e.target.classList.replace('status-closed', 'status-open')
+          } else {
+            e.target.classList.replace('status-open', 'status-closed')
+          }
+        })
+      }
+     
+    </script>
+  </body>
+
+</html>
