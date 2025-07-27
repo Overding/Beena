@@ -14,9 +14,13 @@ const rootSelector = '#storybook-root'
 
 export const run: RunComponentExplorer = () => {
   return new Promise((resolve, _) => {
-    const childProcess = spawn('yarn', [
+    // TODO: The command to run storybook might be different per project
+    const childProcess = spawn('npm', [
+      'run',
       'storybook',
       'dev',
+      '--',
+      '--ci',
       '--no-open',
       '--disable-telemetry',
     ])
@@ -45,8 +49,12 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   await page.goto(baseURL)
 
   // TODO: does expanding the stories work in all versions of storybook?
-  await page.getByLabel('Collapse', { exact: true }).click() // newer versions
-  await page.keyboard.press('ControlOrMeta+Shift+ArrowDown') // version 6
+  const v8ExpandButton = page.getByLabel('Collapse', { exact: true })
+  if (await v8ExpandButton.isVisible()) {
+    await page.getByLabel('Collapse', { exact: true }).click() // version >= 8
+  } else {
+    await page.keyboard.press('ControlOrMeta+Shift+ArrowDown') // version <= 7
+  }
 
   await page
     .locator('[data-nodetype="story"]')
