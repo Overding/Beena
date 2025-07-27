@@ -41,6 +41,7 @@ const storiesDiff = getStoriesDiff(
   baselineBranchStoryIds,
   featureBranchStoryIds,
 )
+console.log({ storiesDiff })
 generateReport(storiesDiff)
 process.exit()
 
@@ -64,8 +65,6 @@ function createReportDirectory() {
 
 function generateReport(storiesDiff: StoryDiff[]) {
   const reportPath = path.join(process.cwd(), reportDirPath, `${diffId}.html`)
-
-  console.log({ storiesDiff })
 
   Handlebars.registerHelper(
     'ifEquals',
@@ -145,10 +144,6 @@ function getStoriesDiff(
           `${story.id}.png`,
         )
 
-        console.log(
-          '>>>',
-          path.join(process.cwd(), reportDirPath, diffId, `${story.id}.png`),
-        )
         fs.writeFileSync(diffShotPath, PNG.sync.write(diff))
       }
     } catch (e) {
@@ -203,7 +198,6 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     .waitFor({ state: 'attached' })
   const storiesLinks = await page.locator('[data-nodetype="story"]')
   const storiesLinksCount = await storiesLinks.count()
-  console.log({ storiesLinksCount })
 
   const workersCount = Math.ceil(Math.max(os.cpus().length / 3, 1))
   const storyPerWorker = Math.ceil(storiesLinksCount / workersCount)
@@ -233,7 +227,6 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     endIndex: number,
     workerIndex: number,
   ) {
-    console.log({ startIndex, endIndex, workerIndex })
     const storyPage = await browser.newPage()
     const workerStoryIds = []
 
@@ -247,14 +240,11 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         .first()
         .getAttribute('href')
 
-      console.log({ storyLink })
-
       if (!storyLink) {
         continue
       }
 
       const storyId = storyLink.split('/').pop() as string
-      console.log({ storyId })
 
       // TODO: it can be #root in lower version of storybook
       const rootSelector = '#storybook-root'
@@ -270,7 +260,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         })
       } catch (_error) {
         if (!retriedStories[storyId] || retriedStories[storyId] < 3) {
-          console.log(
+          console.warn(
             'will retry the ',
             storyId,
             `(retry count ${retriedStories[storyId] ?? 0} so far)`,
@@ -322,13 +312,6 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         )
       })
 
-      console.log(
-        `worker ${workerIndex + 1} taking screenshot of (#${i + 1} of ${
-          endIndex + 1
-        })`,
-        storyId,
-      )
-
       await storyPage.screenshot({
         path: path.join(
           process.cwd(),
@@ -339,8 +322,6 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         fullPage: true,
         animations: 'disabled',
       })
-
-      console.log({ storyId })
 
       workerStoryIds.push(storyId)
     }
