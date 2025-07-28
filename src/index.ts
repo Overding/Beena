@@ -6,7 +6,7 @@ import { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { Command } from 'commander'
 import { chromium } from 'playwright'
 import Handlebars from 'handlebars'
-import { PNG } from 'pngjs'
+import { PNG, PNGWithMetadata } from 'pngjs'
 import pixelmatch from 'pixelmatch'
 
 import { checkoutGitBranch, getGitBranchSHA1 } from './utils/git.js'
@@ -134,7 +134,7 @@ function getComponentsDiff(
       baselineBranchHash,
       `${componentIdDiff.id}.png`,
     )
-    const baselineShotImage = PNG.sync.read(fs.readFileSync(baselineShotPath))
+    let baselineShotImage = PNG.sync.read(fs.readFileSync(baselineShotPath))
 
     const featureShotPath = path.join(
       process.cwd(),
@@ -142,7 +142,70 @@ function getComponentsDiff(
       featureBranchHash,
       `${componentIdDiff.id}.png`,
     )
-    const featureShotImage = PNG.sync.read(fs.readFileSync(featureShotPath))
+    let featureShotImage = PNG.sync.read(fs.readFileSync(featureShotPath))
+
+    /**
+     *  Since baselineShotImage and featureShotImage are expected to be the same
+     *  size, we need to ensure that they have the same dimensions, otherwise
+     *  pixelmatch will not generate the diff image correctly and will throw an
+     *  error: Image sizes do not match. we can fill in the missing pixels with
+     *  transparent pixels.
+     */
+    if (
+      baselineShotImage.width !== featureShotImage.width ||
+      baselineShotImage.height !== featureShotImage.height
+    ) {
+      const maxWidth = Math.max(baselineShotImage.width, featureShotImage.width)
+      const maxHeight = Math.max(
+        baselineShotImage.height,
+        featureShotImage.height,
+      )
+
+      const paddedBaseline = new PNG({ width: maxWidth, height: maxHeight })
+      const paddedFeature = new PNG({ width: maxWidth, height: maxHeight })
+
+      /** Fill the padded images with white pixels to prevent these areas from
+       * being detected as differences */
+      paddedBaseline.data.fill(0xff)
+      paddedFeature.data.fill(0xff)
+
+      // Copy baseline image data into paddedBaseline
+      PNG.bitblt(
+        baselineShotImage,
+        paddedBaseline,
+        0,
+        0,
+        baselineShotImage.width,
+        baselineShotImage.height,
+        0,
+        0,
+      )
+
+      // Copy feature image data into paddedFeature
+      PNG.bitblt(
+        featureShotImage,
+        paddedFeature,
+        0,
+        0,
+        featureShotImage.width,
+        featureShotImage.height,
+        0,
+        0,
+      )
+
+      // Use the padded images from here on
+      baselineShotImage = paddedBaseline as unknown as PNGWithMetadata
+      featureShotImage = paddedFeature as unknown as PNGWithMetadata
+
+      fs.writeFileSync(
+        './baselineShotImage.png',
+        PNG.sync.write(baselineShotImage),
+      )
+      fs.writeFileSync(
+        './featureShotImage.png',
+        PNG.sync.write(featureShotImage),
+      )
+    }
 
     const { width, height } = baselineShotImage
     const diff = new PNG({ width, height })
