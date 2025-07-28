@@ -71,11 +71,11 @@ process.exit()
 async function screenshotStorybookByBranch(branch: string): Promise<string[]> {
   checkoutGitBranch(branch)
   console.log(`Starting up the component explorer (${componentExplorerType})… `)
-  const { port, childProcess } = await componentExplorer.run()
+  const { port, version, childProcess } = await componentExplorer.run()
   childProcesses.push(childProcess)
   console.log(`Component explorer is running at http://localhost:${port}`)
   console.log(`Taking screenshots of components…`)
-  const ComponentIds = await takeScreenshotsOfStorybook(port, branch)
+  const ComponentIds = await takeScreenshotsOfStorybook(port, version, branch)
   console.log(`Took screenshots of components`)
   childProcess.kill()
   return ComponentIds
@@ -266,18 +266,24 @@ function getComponentIdsDiff(
   return componentsDiff
 }
 
-async function takeScreenshotsOfStorybook(port: number, branchName: string) {
+async function takeScreenshotsOfStorybook(
+  port: number,
+  version: string,
+  branchName: string,
+) {
   const startTime = Date.now()
   console.log('taking screenshots for', branchName, 'branch.')
   const browser = await chromium.launch({
-    headless: true,
+    headless: false,
   })
   const page = await browser.newPage()
   const baseURL = `http://localhost:${port}`
 
-  const componentIds = await componentExplorers[
-    componentExplorerType
-  ].getComponentIdsInPage(page, baseURL)
+  const componentIds = await componentExplorer.getComponentIdsInPage(
+    page,
+    version,
+    baseURL,
+  )
 
   const workersCount = Math.ceil(Math.max(os.cpus().length / 3, 1))
   const componentsPerWorker = Math.ceil(componentIds.length / workersCount)
@@ -323,6 +329,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
 
         await componentExplorer.gotoComponentPage(
           workerPage,
+          version,
           baseURL,
           componentId,
           timeout,
@@ -357,7 +364,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
       }
 
       await componentExplorer.fitPageSizeToComponent(workerPage)
-      await componentExplorer.waitUntilComponentIsReady(workerPage)
+      await componentExplorer.waitUntilComponentIsReady(workerPage, version)
 
       await workerPage.screenshot({
         path: path.join(

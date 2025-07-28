@@ -7,16 +7,17 @@ import {
   FitPageSizeToComponent,
   WaitUntilComponentIsReady,
 } from './types.js'
-import { extractPortNumberFromLog } from '../utils/stdio.js'
-
-import type { Page } from 'playwright'
-
-// TODO: it can be #root in lower version (v6?) of storybook
-const rootSelector = '#storybook-root'
+import {
+  extractPortNumberFromLog,
+  extractVersionFromLog,
+} from '../utils/stdio.js'
 
 export const run: RunComponentExplorer = () => {
   return new Promise((resolve, _) => {
-    // TODO: The command to run storybook might be different per project
+    let port: number | null = null
+    let version: string | null = null
+
+    // TODO: The command to run storybook might be different per project on user space
     const childProcess = spawn('npm', [
       'run',
       'storybook',
@@ -30,9 +31,16 @@ export const run: RunComponentExplorer = () => {
     childProcess.stdout.setEncoding('utf8')
     childProcess.stdout.on('data', function (data) {
       console.log(data)
-      const port = extractPortNumberFromLog(data)
-      if (port) {
-        resolve({ port, childProcess })
+      if (!port) {
+        port = extractPortNumberFromLog(data)
+      }
+
+      if (!version) {
+        version = extractVersionFromLog(data)
+      }
+
+      if (port && version) {
+        resolve({ port, version, childProcess })
       }
     })
 
@@ -46,48 +54,47 @@ export const run: RunComponentExplorer = () => {
 
 export const getComponentIdsInPage: GetComponentIdsInPage = async (
   page,
+  version,
   baseURL,
 ) => {
-  const storybookVersion = await getMajorVersionOfStorybook(page, baseURL)
+  const majorVersion = getMajorVersion(version)
 
-  // TODO: does expanding the stories work in all versions of storybook?
-  if (storybookVersion >= 8) {
-    await page.getByLabel('Collapse', { exact: true }).click() // version >= 8
-  } else {
-    await page.keyboard.press('ControlOrMeta+Shift+ArrowDown') // version <= 7
-  }
-
+  await page.goto(baseURL)
   await page
-    .locator('[data-nodetype="story"]')
+    .locator('[data-nodetype="component"]')
     .first()
     .waitFor({ state: 'attached' })
+  console.log('sending keyboard shortcut to open the component explorer')
+  await page.keyboard.press('ControlOrMeta+Shift+ArrowDown')
+  console.log('sent ControlOrMeta+Shift+ArrowDown')
+
   const storiesLinks = await page.locator('[data-nodetype="story"]').all()
 
   const storiesIds = (
     await Promise.all(
       storiesLinks.map((item) =>
-        //TODO: difference in different versions of storybook!! a is not nested in the previous versions
-        item.locator('a').first().getAttribute('href'),
+        majorVersion >= 7
+          ? item.locator('a').first().getAttribute('href')
+          : item.getAttribute('href'),
       ),
     )
   )
     .filter((item) => item !== null)
     .map((item) => item.split('/').pop() as string)
-
+  console.log({ storiesIds })
   return storiesIds
 }
 
 export const gotoComponentPage: GotoComponentPage = async (
   page,
+  version,
   baseURL,
   componentId,
   timeout,
 ) => {
-  await page.goto(`${baseURL}/iframe.html?viewMode=story&id=${componentId}`, {
-    waitUntil: 'networkidle',
-    timeout: 60000,
-  })
-
+  const rootSelector =
+    getMajorVersion(version) === 6 ? '#root' : '#storybook-root'
+  await page.goto(`${baseURL}/iframe.html?viewMode=story&id=${componentId}`)
   await page.waitForSelector(rootSelector, { timeout })
 }
 
@@ -104,7 +111,10 @@ export const fitPageSizeToComponent: FitPageSizeToComponent = async (page) => {
 
 export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
   page,
+  version,
 ) => {
+  const rootSelector =
+    getMajorVersion(version) === 6 ? '#root' : '#storybook-root'
   await page.waitForFunction<boolean, string>((rootSelector) => {
     return (
       document.querySelector(rootSelector).children.length > 0 &&
@@ -128,19 +138,11 @@ export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
   })
 }
 
-const getMajorVersionOfStorybook = async (
-  page: Page,
-  baseURL: string,
-): Promise<number> => {
-  await page.goto(baseURL + '/?path=/settings/about')
-  const versionText = await page.getByText('You are on Storybook').textContent()
-
+const getMajorVersion = (version: string): number => {
   //extract the major version out of a string which has full version in it
-  const versionMatch = versionText?.match(/(\d+)\.(\d+)\.(\d+)/)
+  const versionMatch = version?.match(/(\d+)\.(\d+)\.(\d+)/)
   if (!versionMatch) {
-    throw new Error(
-      'Could not extract Storybook version from text: ' + versionText,
-    )
+    throw new Error('Could not extract Storybook version: ' + version)
   }
 
   return parseInt(versionMatch[1], 10)

@@ -8,3 +8,14 @@ export function extractPortNumberFromLog(log: string): number | null {
 
   return null
 }
+
+export function extractVersionFromLog(log: string): string | null {
+  const regex = /Storybook (\d+\.\d+\.\d+) for/
+  const versionMatch = log.match(regex)
+
+  if (versionMatch) {
+    return versionMatch[1]
+  }
+
+  return null
+}
