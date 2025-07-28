@@ -9,7 +9,9 @@ import {
 } from './types.js'
 import { extractPortNumberFromLog } from '../utils/stdio.js'
 
-// TODO: it can be #root in lower version of storybook
+import type { Page } from 'playwright'
+
+// TODO: it can be #root in lower version (v6?) of storybook
 const rootSelector = '#storybook-root'
 
 export const run: RunComponentExplorer = () => {
@@ -46,11 +48,10 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   page,
   baseURL,
 ) => {
-  await page.goto(baseURL)
+  const storybookVersion = await getMajorVersionOfStorybook(page, baseURL)
 
   // TODO: does expanding the stories work in all versions of storybook?
-  const v8ExpandButton = page.getByLabel('Collapse', { exact: true })
-  if (await v8ExpandButton.isVisible()) {
+  if (storybookVersion >= 8) {
     await page.getByLabel('Collapse', { exact: true }).click() // version >= 8
   } else {
     await page.keyboard.press('ControlOrMeta+Shift+ArrowDown') // version <= 7
@@ -125,4 +126,22 @@ export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
       }),
     )
   })
+}
+
+const getMajorVersionOfStorybook = async (
+  page: Page,
+  baseURL: string,
+): Promise<number> => {
+  await page.goto(baseURL + '/?path=/settings/about')
+  const versionText = await page.getByText('You are on Storybook').textContent()
+
+  //extract the major version out of a string which has full version in it
+  const versionMatch = versionText?.match(/(\d+)\.(\d+)\.(\d+)/)
+  if (!versionMatch) {
+    throw new Error(
+      'Could not extract Storybook version from text: ' + versionText,
+    )
+  }
+
+  return parseInt(versionMatch[1], 10)
 }
