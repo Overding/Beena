@@ -15,11 +15,13 @@ export const run: RunComponentExplorer = () => {
   return new Promise((resolve, _) => {
     let port: number | null = null
 
-    const childProcess = spawn('npm', [
-      'run',
-      'storybook',
+    const storybookExecutable =
+      getStorybookMajorVersion() >= 7 ? 'storybook' : 'start-storybook'
+    const childProcess = spawn('npx', [
+      '--no-install',
+      '--no',
+      storybookExecutable,
       'dev',
-      '--',
       '--ci',
       '--no-open',
       '--disable-telemetry',
@@ -49,7 +51,7 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   page,
   baseURL,
 ) => {
-  const majorVersion = getMajorVersion(getStorybookVersion())
+  const majorVersion = getStorybookMajorVersion()
 
   await page.goto(baseURL)
   await page
@@ -83,7 +85,7 @@ export const gotoComponentPage: GotoComponentPage = async (
   timeout,
 ) => {
   const rootSelector =
-    getMajorVersion(getStorybookVersion()) === 6 ? '#root' : '#storybook-root'
+    getStorybookMajorVersion() === 6 ? '#root' : '#storybook-root'
   await page.goto(`${baseURL}/iframe.html?viewMode=story&id=${componentId}`)
   await page.waitForSelector(rootSelector, { timeout })
 }
@@ -103,7 +105,7 @@ export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
   page,
 ) => {
   const rootSelector =
-    getMajorVersion(getStorybookVersion()) === 6 ? '#root' : '#storybook-root'
+    getStorybookMajorVersion() === 6 ? '#root' : '#storybook-root'
   await page.waitForFunction<boolean, string>((rootSelector) => {
     return (
       document.querySelector(rootSelector).children.length > 0 &&
@@ -125,6 +127,21 @@ export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
       }),
     )
   })
+}
+
+const getStorybookMajorVersion = (): number => {
+  const version = getStorybookVersion()
+  if (!version) {
+    throw new Error('Could not extract Storybook version')
+  }
+
+  //extract the major version out of a string which has full version in it
+  const versionMatch = version?.match(/(\d+)\.(\d+)\.(\d+)/)
+  if (!versionMatch) {
+    throw new Error('Could not extract Storybook version: ' + version)
+  }
+
+  return parseInt(versionMatch[1], 10)
 }
 
 let cachedStorybookVersion: string | null = null
@@ -197,18 +214,4 @@ function getStorybookVersion(): string | null {
     cachedStorybookVersion = null
     return cachedStorybookVersion
   }
-}
-
-const getMajorVersion = (version: string | null): number => {
-  if (!version) {
-    throw new Error('Could not extract Storybook version')
-  }
-
-  //extract the major version out of a string which has full version in it
-  const versionMatch = version?.match(/(\d+)\.(\d+)\.(\d+)/)
-  if (!versionMatch) {
-    throw new Error('Could not extract Storybook version: ' + version)
-  }
-
-  return parseInt(versionMatch[1], 10)
 }
