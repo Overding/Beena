@@ -1,102 +1,186 @@
 <html lang='en'>
 
-  <head>
-    <meta charset='UTF-8' />
-    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-    <title>Regvis Report</title>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>Beena Report</title>
 
-    <style>
-        body {
-          font-family: Arial, Helvetica, sans-serif;
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .component.invisible {
+      display: none;
+    }
+
+    .component[data-status='changed'],
+    .component[data-status='added'],
+    .component[data-status='deleted'] {
+      cursor: pointer;
+    }
+
+    .component.status-closed .shots {
+      display: none;
+    }
+
+    .component.status-open .shots {
+      display: block;
+    }
+
+    .status {
+      display: inline-block;
+      text-transform: uppercase;
+      padding: 0.2em 0.7em;
+      font-size: 0.8em;
+      margin-right: 1em;
+      border-radius: 5px;
+    }
+
+    .status.ok {
+      background-color: gray;
+      color: #ffffff;
+    }
+
+    .status.deleted {
+      background-color: red;
+      color: #fff;
+    }
+
+    .status.added {
+      background-color: green;
+      color: #fff;
+    }
+
+    .status.changed {
+      background-color: rgb(179, 0, 111);
+      color: #fff;
+    }
+
+    #summary-wrapper {
+      display: flex;
+      max-width: fit-content;
+      height: max-content;
+      flex-direction: row;
+      gap: 1.6em;
+      align-content: center;
+      flex-grow: 0;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #summary-wrapper button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 7em;
+      height: 2.2em;
+      text-transform: uppercase;
+      padding: 0.2em 0.7em;
+      font-size: 0.9em;
+      margin: 0 auto;
+      border-radius: 8px;
+      border: 1px solid;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    #summary-wrapper button.selected {
+      border: 3px solid #000;
+    }
+  </style>
+</head>
+
+<body>
+  <div id='summary-wrapper'>
+    <button data-for-status="ok">
+      <span class='status'> OK </span>
+      <span class='count'>{{componentCountByStatus.ok}}</span>
+    </button>
+    <button data-for-status="added">
+      <span class='status'> Added </span>
+      <span class='count'>{{componentCountByStatus.added}}</span>
+    </button>
+    <button data-for-status="changed">
+      <span class='status'> Changed </span>
+      <span class='count'>{{componentCountByStatus.changed}}</span>
+    </button>
+    <button data-for-status="deleted">
+      <span class='status'> Deleted </span>
+      <span class='count'>{{componentCountByStatus.deleted}}</span>
+    </button>
+  </div>
+  <ul id="components-list">
+    {{#componentsDiff}}
+    <li class="component status-closed" data-status='{{status}}'>
+      <span class="status {{status}}">{{status}}</span>
+      {{id}}
+      <div class="shots">
+        {{#ifEquals status 'ok'}}
+        <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
+        {{/ifEquals}}
+
+        {{#ifEquals status 'added'}}
+        <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
+        {{/ifEquals}}
+
+        {{#ifEquals status 'deleted'}}
+        <img src='../screenshots/{{../baselineBranchHash}}/{{id}}.png' />
+        {{/ifEquals}}
+
+        {{#ifEquals status 'changed'}}
+        <img src='../screenshots/{{../baselineBranchHash}}/{{id}}.png' />
+        <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
+        <img src='./{{../diffId}}/{{id}}.png' />
+        {{/ifEquals}}
+      </div>
+    </li>
+    {{/componentsDiff}}
+  </ul>
+
+  <script>
+    const componentsListItems = document.querySelectorAll('#components-list li')
+    for (const listitem of componentsListItems) {
+      listitem.addEventListener('click', function (e) {
+        if (e.target.classList.contains('status-closed')) {
+          e.target.classList.replace('status-closed', 'status-open')
+        } else {
+          e.target.classList.replace('status-open', 'status-closed')
         }
+      })
+    }
 
-        .component[data-status='changed'],
-        .component[data-status='added'],
-        .component[data-status='deleted'] {
-          cursor: pointer;
-        }
+    const summaryButtons = document.querySelectorAll('#summary-wrapper button')
+    for (const summaryButton of summaryButtons) {
+      summaryButton.addEventListener('click', function (e) {
+        const target = e.currentTarget
+        const forStatus = target.getAttribute('data-for-status')
 
-        .component.status-closed .shots {
-          display: none;
-        }
-
-        .component.status-open .shots {
-          display: block;
-        }
-
-        .status {
-          display: inline-block;
-          text-transform: uppercase;
-          padding: .2em .7em;
-          font-size: .8em;
-          margin-right: 1em;
-          border-radius: 5px;
-        }
-
-       .status.ok {
-        background-color: gray;
-        color: #ffffff;
-       }
-
-        .status.deleted {
-        background-color: red;
-        color: #fff;
-       }
-
-        .status.added {
-          background-color: green;
-          color: #fff;
-        }
-
-        .status.changed {
-        background-color: rgb(179, 0, 111);
-        color: #fff;
-       }
-    </style>
-  </head>
-
-  <body>
-    <ul>
-      {{#componentsDiff}}
-        <li class="component status-closed" data-status='{{status}}'>
-          <span class="status {{status}}">{{status}}</span>
-          {{id}}
-          <div class="shots">
-          {{#ifEquals status 'ok'}}
-            <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
-          {{/ifEquals}}
-
-          {{#ifEquals status 'added'}}
-            <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
-          {{/ifEquals}}
-
-          {{#ifEquals status 'deleted'}}
-            <img src='../screenshots/{{../baselineBranchHash}}/{{id}}.png' />
-          {{/ifEquals}}
-
-           {{#ifEquals status 'changed'}}
-            <img src='../screenshots/{{../baselineBranchHash}}/{{id}}.png' />
-            <img src='../screenshots/{{../featureBranchHash}}/{{id}}.png' />
-            <img src='./{{../diffId}}/{{id}}.png' />
-          {{/ifEquals}}
-          </div>
-        </li>
-      {{/componentsDiff}}
-    </ul>
-
-    <script>
-      const listItems  = document.querySelectorAll('li')
-      for(listitem of listItems) {
-        listitem.addEventListener('click', e => {
-          if(e.target.classList.contains('status-closed')) {
-            e.target.classList.replace('status-closed', 'status-open')
-          } else {
-            e.target.classList.replace('status-open', 'status-closed')
+        if (target.classList.contains('selected')) {
+          for (const listitem of componentsListItems) {
+            listitem.classList.remove('invisible')
           }
-        })
+          removeClassNameFromElements(summaryButtons, 'selected')
+        } else {
+          for (const listitem of componentsListItems) {
+            if (listitem.getAttribute('data-status') === forStatus) {
+              listitem.classList.remove('invisible')
+            } else {
+              listitem.classList.add('invisible')
+            }
+          }
+          removeClassNameFromElements(summaryButtons, 'selected')
+          target.classList.add('selected')
+        }
+      })
+    }
+
+    function removeClassNameFromElements(elems, className) {
+      for (const elem of elems) {
+        elem.classList.remove(className)
       }
-     
-    </script>
-  </body>
+    }
+  </script>
+</body>
 
 </html>

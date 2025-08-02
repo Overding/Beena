@@ -19,6 +19,8 @@ type ComponentDiff = {
   status: 'ok' | 'added' | 'deleted' | 'changed'
 }
 
+type ComponentCountByStatus = Record<ComponentDiff['status'], number>
+
 const cmd = new Command()
 cmd
   .requiredOption(
@@ -96,6 +98,17 @@ function generateReport(componentsDiff: ComponentDiff[]) {
     },
   )
 
+  const componentCountByStatus: ComponentCountByStatus = {
+    ok: 0,
+    added: 0,
+    changed: 0,
+    deleted: 0,
+  }
+
+  for (const component of componentsDiff) {
+    componentCountByStatus[component.status]++
+  }
+
   const template = Handlebars.compile(
     fs.readFileSync(path.join(getModuleDir(), 'report-template.hbs'), 'utf8'),
   )
@@ -104,6 +117,7 @@ function generateReport(componentsDiff: ComponentDiff[]) {
     baselineBranchHash,
     featureBranchHash,
     componentsDiff,
+    componentCountByStatus,
   })
 
   fs.writeFileSync(reportPath, reportContent)
