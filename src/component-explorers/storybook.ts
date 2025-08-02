@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 
 import {
   RunComponentExplorer,
@@ -7,17 +9,12 @@ import {
   FitPageSizeToComponent,
   WaitUntilComponentIsReady,
 } from './types.js'
-import {
-  extractPortNumberFromLog,
-  extractVersionFromLog,
-} from '../utils/stdio.js'
+import { extractPortNumberFromLog } from '../utils/stdio.js'
 
 export const run: RunComponentExplorer = () => {
   return new Promise((resolve, _) => {
     let port: number | null = null
-    let version: string | null = null
 
-    // TODO: The command to run storybook might be different per project on user space
     const childProcess = spawn('npm', [
       'run',
       'storybook',
@@ -35,12 +32,8 @@ export const run: RunComponentExplorer = () => {
         port = extractPortNumberFromLog(data)
       }
 
-      if (!version) {
-        version = extractVersionFromLog(data)
-      }
-
-      if (port && version) {
-        resolve({ port, version, childProcess })
+      if (port) {
+        resolve({ port, childProcess })
       }
     })
 
@@ -54,10 +47,9 @@ export const run: RunComponentExplorer = () => {
 
 export const getComponentIdsInPage: GetComponentIdsInPage = async (
   page,
-  version,
   baseURL,
 ) => {
-  const majorVersion = getMajorVersion(version)
+  const majorVersion = getMajorVersion(getStorybookVersion())
 
   await page.goto(baseURL)
   await page
@@ -81,19 +73,17 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   )
     .filter((item) => item !== null)
     .map((item) => item.split('/').pop() as string)
-  console.log({ storiesIds })
   return storiesIds
 }
 
 export const gotoComponentPage: GotoComponentPage = async (
   page,
-  version,
   baseURL,
   componentId,
   timeout,
 ) => {
   const rootSelector =
-    getMajorVersion(version) === 6 ? '#root' : '#storybook-root'
+    getMajorVersion(getStorybookVersion()) === 6 ? '#root' : '#storybook-root'
   await page.goto(`${baseURL}/iframe.html?viewMode=story&id=${componentId}`)
   await page.waitForSelector(rootSelector, { timeout })
 }
@@ -111,10 +101,9 @@ export const fitPageSizeToComponent: FitPageSizeToComponent = async (page) => {
 
 export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
   page,
-  version,
 ) => {
   const rootSelector =
-    getMajorVersion(version) === 6 ? '#root' : '#storybook-root'
+    getMajorVersion(getStorybookVersion()) === 6 ? '#root' : '#storybook-root'
   await page.waitForFunction<boolean, string>((rootSelector) => {
     return (
       document.querySelector(rootSelector).children.length > 0 &&
@@ -138,7 +127,83 @@ export const waitUntilComponentIsReady: WaitUntilComponentIsReady = async (
   })
 }
 
-const getMajorVersion = (version: string): number => {
+let cachedStorybookVersion: string | null = null
+function getStorybookVersion(): string | null {
+  if (cachedStorybookVersion) {
+    return cachedStorybookVersion
+  }
+
+  try {
+    // List of common Storybook renderer/framework packages to check
+    const storybookPackages = [
+      '@storybook/react',
+      '@storybook/vue',
+      '@storybook/vue3',
+      '@storybook/angular',
+      '@storybook/web-components',
+      '@storybook/html',
+      '@storybook/svelte',
+      '@storybook/preact',
+      '@storybook/ember',
+      '@storybook/nextjs',
+      '@storybook/sveltekit',
+      '@storybook/qwik',
+      '@storybook/solid',
+
+      // Framework packages (newer naming convention)
+      '@storybook/react-webpack5',
+      '@storybook/react-vite',
+      '@storybook/vue3-webpack5',
+      '@storybook/vue3-vite',
+      '@storybook/angular-webpack5',
+
+      // Core packages that might contain version info
+      '@storybook/core',
+      '@storybook/core-server',
+      'storybook', // Main package in newer versions
+    ]
+
+    const installedPackages = []
+
+    // Check each potential Storybook package
+    for (const packageName of storybookPackages) {
+      try {
+        const packagePath = path.resolve(
+          'node_modules',
+          packageName,
+          'package.json',
+        )
+        if (fs.existsSync(packagePath)) {
+          const packageInfo = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
+          installedPackages.push({
+            name: packageName,
+            version: packageInfo.version,
+          })
+        }
+      } catch (_) {
+        // Skip packages that can't be read
+        continue
+      }
+    }
+
+    if (installedPackages.length === 0) {
+      cachedStorybookVersion = null
+      return null
+    }
+
+    cachedStorybookVersion = installedPackages[0].version as string
+    return cachedStorybookVersion
+  } catch (_) {
+    cachedStorybookVersion = null
+    return cachedStorybookVersion
+  }
+}
+
+const getMajorVersion = (version: string | null): number => {
+  if (!version) {
+    throw new Error('Could not extract Storybook version')
+  }
+
   //extract the major version out of a string which has full version in it
   const versionMatch = version?.match(/(\d+)\.(\d+)\.(\d+)/)
   if (!versionMatch) {
