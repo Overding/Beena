@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "eslint ./src/",
     "start": "tsx src/index.ts",
-    "dev": "yarn run watch:report-template && pkgroll -w ",
+    "dev": "npm run watch:report-template && pkgroll -w ",
     "build": "pkgroll && copy:report-template",
     "copy:report-template": "mkdir -p dist && cp src/report-template.html dist/report-template.html",
     "watch:report-template": "chokidar 'src/report-template.html' -c \"yarn copy:report-template\" --initial"
@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "commander": "^14.0.0",
-    "handlebars": "^4.7.8",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.54.1",
     "pngjs": "^7.0.0"
