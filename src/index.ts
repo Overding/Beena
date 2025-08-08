@@ -86,15 +86,6 @@ function createReportDirectory() {
 }
 
 function generateReport(componentsDiff: ComponentDiff[]) {
-  const reportPath = path.join(process.cwd(), reportDirPath, `${jobId}.html`)
-
-  Handlebars.registerHelper(
-    'ifEquals',
-    function (this: unknown, arg1, arg2, options) {
-      return arg1 === arg2 ? options.fn(this) : options.inverse(this)
-    },
-  )
-
   const reportConfig = {
     jobId,
     baselineBranch,
@@ -112,6 +103,7 @@ function generateReport(componentsDiff: ComponentDiff[]) {
     .replace('{ /* config */ }', JSON.stringify(reportConfig, null, 2))
     .replace('{ /* componentDiffs */ }', JSON.stringify(componentsDiff))
 
+  const reportPath = path.join(process.cwd(), reportDirPath, `${jobId}.html`)
   fs.writeFileSync(reportPath, reportContent)
   console.log('Report has been saved to:', path.resolve(reportPath))
 }
