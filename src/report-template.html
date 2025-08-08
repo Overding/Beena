@@ -774,15 +774,6 @@
 
     // Initialize when DOM is loaded
     document.addEventListener('DOMContentLoaded', init);
-
-    // Export function to update component diffs from external source
-    window.updateComponentDiffs = function (newDiffs) {
-      componentDiffs.length = 0;
-      componentDiffs.push(...newDiffs);
-      updateSummary();
-      renderComponents();
-      attachEventListeners();
-    };
   </script>
 </body>
 
