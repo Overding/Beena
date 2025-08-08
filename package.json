@@ -11,7 +11,7 @@
     "lint": "eslint ./src/",
     "start": "tsx src/index.ts",
     "dev": "npm run watch:report-template && pkgroll -w ",
-    "build": "pkgroll && copy:report-template",
+    "build": "pkgroll && npm run copy:report-template",
     "copy:report-template": "mkdir -p dist && cp src/report-template.html dist/report-template.html",
     "watch:report-template": "chokidar 'src/report-template.html' -c \"yarn copy:report-template\" --initial"
   },
