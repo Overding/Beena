@@ -7,6 +7,7 @@
   "main": "sr/index.ts",
   "bin": "./dist/index.mjs",
   "scripts": {
+    "postinstall": "npx playwright install chromium",
     "lint": "eslint ./src/",
     "start": "tsx src/index.ts",
     "dev": "npm run watch:report-template && pkgroll -w ",
