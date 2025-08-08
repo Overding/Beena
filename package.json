@@ -9,13 +9,17 @@
   "scripts": {
     "lint": "eslint ./src/",
     "start": "tsx src/index.ts",
-    "build": "pkgroll"
+    "dev": "yarn run watch:report-template && pkgroll -w ",
+    "build": "pkgroll && copy:report-template",
+    "copy:report-template": "mkdir -p dist && cp src/report-template.html dist/report-template.html",
+    "watch:report-template": "chokidar 'src/report-template.html' -c \"yarn copy:report-template\" --initial"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@tsconfig/node22": "^22.0.2",
     "@types/node": "^24.1.0",
     "@types/pngjs": "^6.0.5",
+    "chokidar-cli": "^3.0.0",
     "eslint": "^9.32.0",
     "pkgroll": "^2.14.5",
     "prettier": "^3.6.2",
