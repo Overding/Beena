@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Component Diff Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      color: #64748b;
+      font-size: 1.1rem;
+    }
+
+    .summary {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .summary h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #0f172a;
+    }
+
+    .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .stat-card {
+      background: #dfeffd;
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+      border-left: 2px solid #f8fafc;
+      transition: transform 0.2s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .stat-card.active {
+      background: #f4f7ff;
+      border: 2px solid #3b82f6;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    }
+
+    .stat-card.ok {
+      background: #dcfce7;
+    }
+
+    .stat-card.ok.active {
+      border: 2px solid #10b981;
+    }
+
+    .stat-card.added {
+      background: #dbeafe;
+    }
+
+    .stat-card.added.active {
+      border: 2px solid #3b82f6;
+    }
+
+    .stat-card.changed {
+      background: #fef3c7;
+    }
+
+    .stat-card.changed.active {
+      border: 2px solid #f59e0b;
+    }
+
+    .stat-card.deleted {
+      background: #fee2e2;
+    }
+
+    .stat-card.deleted.active {
+      border: 2px solid #ef4444;
+    }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card.ok .stat-number {
+      color: #10b981;
+    }
+
+    .stat-card.added .stat-number {
+      color: #3b82f6;
+    }
+
+    .stat-card.changed .stat-number {
+      color: #f59e0b;
+    }
+
+    .stat-card.deleted .stat-number {
+      color: #ef4444;
+    }
+
+    .components-list {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .component-item {
+      border-bottom: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .component-item:last-child {
+      border-bottom: none;
+    }
+
+    .component-item:hover {
+      background-color: #f8fafc;
+    }
+
+    .component-header {
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .component-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .component-id {
+      font-weight: 600;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 0.9rem;
+    }
+
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-badge.ok {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .status-badge.added {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .status-badge.changed {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-badge.deleted {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .component-content {
+      padding: 0 1.5rem 1.5rem;
+      display: none;
+    }
+
+    .component-content.open {
+      display: block;
+    }
+
+    .image-container {
+      margin-top: 1rem;
+    }
+
+    .image-container img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .comparison-container {
+      position: relative;
+      margin-top: 1rem;
+    }
+
+    .comparison-view {
+      position: relative;
+      overflow: hidden;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      width: 100%;
+    }
+
+    .comparison-slider {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 2px;
+      height: 100%;
+      background: #3b82f6;
+      cursor: ew-resize;
+      z-index: 10;
+    }
+
+    .comparison-slider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      background: #3b82f6;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .comparison-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    .comparison-image.baseline {
+      clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+    }
+
+    .comparison-image.feature {
+      clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .toggle-btn {
+      padding: 0.5rem 1rem;
+      border: 2px solid #e2e8f0;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .toggle-btn.active {
+      background: #3b82f6;
+      color: white;
+      border-color: #3b82f6;
+    }
+
+    .toggle-btn:hover:not(.active) {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+
+    .chevron {
+      transition: transform 0.2s ease;
+    }
+
+    .component-item.open .chevron {
+      transform: rotate(180deg);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .summary-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .component-header {
+        padding: 1rem;
+      }
+
+      .component-content {
+        padding: 0 1rem 1rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Visual regression report</h1>
+      <p class="description">Generated by Beena at {datetime}</p>
+    </div>
+
+    <div class="summary">
+      <h2>Summary</h2>
+      <div class="summary-stats">
+        <div class="stat-card ok">
+          <div class="stat-number" id="ok-count">0</div>
+          <div class="stat-label">OK</div>
+        </div>
+        <div class="stat-card added">
+          <div class="stat-number" id="added-count">0</div>
+          <div class="stat-label">Added</div>
+        </div>
+        <div class="stat-card changed">
+          <div class="stat-number" id="changed-count">0</div>
+          <div class="stat-label">Changed</div>
+        </div>
+        <div class="stat-card deleted">
+          <div class="stat-number" id="deleted-count">0</div>
+          <div class="stat-label">Deleted</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="components-list" id="components-list">
+      <!-- Components will be dynamically inserted here -->
+    </div>
+  </div>
+
+  <script>
+    // Configuration - Here is the config object sample that can be passed to the template
+    // const config = {
+    //   jobId: '1205010921a35e8',
+    //   featureBranchHash: '9c0d307661205010921a35e8c54b55980bfa736a',
+    //   baselineBranchHash: 'f5b5938aa48a45a76c917252e26911023c23629c'
+    // };
+    const config = { /* config */ };
+
+    // Sample data - Here is the componentDiffs array sample that can be passed to the template
+    // const componentDiffs = [
+    //   { id: 'example-button--large', status: 'deleted' },
+    //   { id: 'example-button--medium', status: 'changed' },
+    //   { id: 'example-button--small', status: 'ok' },
+    //   { id: 'example-button--small-neo', status: 'added' },
+    // ];
+    const componentDiffs = { /* componentDiffs */ };
+
+    // Global state for filtering
+    let currentFilter = null;
+
+    // Initialize the application
+    function init() {
+      updateTitle();
+      updateSummary();
+      renderComponents();
+      attachEventListeners();
+    }
+
+    function updateTitle() {
+      document.title = `Beena Visual regression report`;
+      const date = new Date(config.timestamp);
+      document.querySelector('.header .description').textContent = `Generated by Beena at ${date.toLocaleString()}`;
+    }
+
+    // Update summary statistics
+    function updateSummary() {
+      const counts = {
+        ok: 0,
+        added: 0,
+        changed: 0,
+        deleted: 0
+      };
+
+      componentDiffs.forEach(diff => {
+        counts[diff.status]++;
+      });
+
+      document.getElementById('ok-count').textContent = counts.ok;
+      document.getElementById('added-count').textContent = counts.added;
+      document.getElementById('changed-count').textContent = counts.changed;
+      document.getElementById('deleted-count').textContent = counts.deleted;
+    }
+
+    // Render all components
+    function renderComponents() {
+      const container = document.getElementById('components-list');
+      container.innerHTML = '';
+
+      componentDiffs.forEach(diff => {
+        // Apply filter if active
+        if (currentFilter && diff.status !== currentFilter) {
+          return; // Skip this component
+        }
+
+        const componentElement = createComponentElement(diff);
+        container.appendChild(componentElement);
+      });
+    }
+
+    // Create a component element
+    function createComponentElement(diff) {
+      const div = document.createElement('div');
+      div.className = 'component-item';
+      div.dataset.id = diff.id;
+      div.dataset.status = diff.status;
+
+      const header = createComponentHeader(diff);
+      const content = createComponentContent(diff);
+
+      div.appendChild(header);
+      div.appendChild(content);
+
+      return div;
+    }
+
+    // Create component header
+    function createComponentHeader(diff) {
+      const header = document.createElement('div');
+      header.className = 'component-header';
+
+      const info = document.createElement('div');
+      info.className = 'component-info';
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `status-badge ${diff.status}`;
+      statusBadge.textContent = diff.status;
+
+      const componentId = document.createElement('span');
+      componentId.className = 'component-id';
+      componentId.textContent = diff.id;
+
+      const chevron = document.createElement('span');
+      chevron.className = 'chevron';
+      chevron.innerHTML = '▼';
+
+      info.appendChild(statusBadge);
+      info.appendChild(componentId);
+      header.appendChild(info);
+      header.appendChild(chevron);
+
+      return header;
+    }
+
+    // Create component content
+    function createComponentContent(diff) {
+      const content = document.createElement('div');
+      content.className = 'component-content';
+
+      if (diff.status === 'changed') {
+        content.appendChild(createChangedComponentContent(diff));
+      } else {
+        content.appendChild(createSimpleComponentContent(diff));
+      }
+
+      return content;
+    }
+
+    // Create content for simple components (ok, added, deleted)
+    function createSimpleComponentContent(diff) {
+      const container = document.createElement('div');
+      container.className = 'image-container';
+
+      const img = document.createElement('img');
+
+      if (diff.status === 'deleted') {
+        img.src = `../screenshots/${config.baselineBranchHash}/${diff.id}.png`;
+      } else {
+        img.src = `../screenshots/${config.featureBranchHash}/${diff.id}.png`;
+      }
+
+      img.alt = `${diff.id} screenshot`;
+      img.onerror = () => {
+        img.style.display = 'none';
+        const errorMsg = document.createElement('p');
+        errorMsg.textContent = 'Screenshot not available';
+        errorMsg.style.color = '#ef4444';
+        errorMsg.style.fontStyle = 'italic';
+        container.appendChild(errorMsg);
+      };
+
+      container.appendChild(img);
+      return container;
+    }
+
+    // Create content for changed components
+    function createChangedComponentContent(diff) {
+      const container = document.createElement('div');
+
+      // View toggle
+      const toggleContainer = document.createElement('div');
+      toggleContainer.className = 'view-toggle';
+
+      const sliderBtn = document.createElement('button');
+      sliderBtn.className = 'toggle-btn active';
+      sliderBtn.textContent = 'Slider View';
+      sliderBtn.dataset.view = 'slider';
+
+      const diffBtn = document.createElement('button');
+      diffBtn.className = 'toggle-btn';
+      diffBtn.textContent = 'Diff View';
+      diffBtn.dataset.view = 'diff';
+
+      toggleContainer.appendChild(sliderBtn);
+      toggleContainer.appendChild(diffBtn);
+
+      // Slider view
+      const sliderView = createSliderView(diff);
+      sliderView.id = `slider-${diff.id}`;
+
+      // Diff view
+      const diffView = createDiffView(diff);
+      diffView.id = `diff-${diff.id}`;
+      diffView.classList.add('hidden');
+
+      container.appendChild(toggleContainer);
+      container.appendChild(sliderView);
+      container.appendChild(diffView);
+
+      return container;
+    }
+
+    // Create slider view for changed components
+    function createSliderView(diff) {
+      const container = document.createElement('div');
+      container.className = 'comparison-container';
+
+      const comparisonView = document.createElement('div');
+      comparisonView.className = 'comparison-view';
+
+      const baselineImg = document.createElement('img');
+      baselineImg.className = 'comparison-image baseline';
+      baselineImg.src = `../screenshots/${config.baselineBranchHash}/${diff.id}.png`;
+      baselineImg.alt = `${diff.id} baseline`;
+
+      const featureImg = document.createElement('img');
+      featureImg.className = 'comparison-image feature';
+      featureImg.src = `../screenshots/${config.featureBranchHash}/${diff.id}.png`;
+      featureImg.alt = `${diff.id} feature`;
+
+      const slider = document.createElement('div');
+      slider.className = 'comparison-slider';
+
+      comparisonView.appendChild(baselineImg);
+      comparisonView.appendChild(featureImg);
+      comparisonView.appendChild(slider);
+      container.appendChild(comparisonView);
+
+      // Set the height of the comparison view once images are loaded
+      function setComparisonViewHeight() {
+        recalcComparisonViewHeight(comparisonView);
+      }
+
+      // Set height when either image loads
+      baselineImg.onload = setComparisonViewHeight;
+      featureImg.onload = setComparisonViewHeight;
+
+      // Fallback: set height after a short delay if images are already loaded
+      setTimeout(setComparisonViewHeight, 100);
+
+      return container;
+    }
+
+    // Shared: recalc height of a single comparison view based on baseline image aspect ratio
+    function recalcComparisonViewHeight(comparisonView) {
+      if (!comparisonView) return;
+      const baseline = comparisonView.querySelector('.comparison-image.baseline');
+      if (!baseline) return;
+      const naturalW = baseline.naturalWidth || baseline.width;
+      const naturalH = baseline.naturalHeight || baseline.height;
+      if (!naturalW || !naturalH) return;
+      const containerWidth = comparisonView.clientWidth || comparisonView.parentElement?.clientWidth || 0;
+      if (!containerWidth) return;
+      const height = Math.max(1, Math.round((containerWidth * naturalH) / naturalW));
+      comparisonView.style.height = height + 'px';
+    }
+
+    // Shared: recalc all comparison views within a root element
+    function recalcComparisonsInElement(root) {
+      if (!root) return;
+      const views = root.querySelectorAll('.comparison-view');
+      views.forEach((view) => recalcComparisonViewHeight(view));
+    }
+
+    // Create diff view for changed components
+    function createDiffView(diff) {
+      const container = document.createElement('div');
+      container.className = 'image-container';
+
+      const img = document.createElement('img');
+      img.src = `./${config.jobId}/${diff.id}.png`;
+      img.alt = `${diff.id} diff`;
+      img.onerror = () => {
+        img.style.display = 'none';
+        const errorMsg = document.createElement('p');
+        errorMsg.textContent = 'Diff image not available';
+        errorMsg.style.color = '#ef4444';
+        errorMsg.style.fontStyle = 'italic';
+        container.appendChild(errorMsg);
+      };
+
+      container.appendChild(img);
+      return container;
+    }
+
+    // Attach event listeners
+    function attachEventListeners() {
+      // Summary card filtering
+      document.addEventListener('click', (e) => {
+        const statCard = e.target.closest('.stat-card');
+        if (statCard) {
+          const status = statCard.classList.contains('ok') ? 'ok' :
+            statCard.classList.contains('added') ? 'added' :
+              statCard.classList.contains('changed') ? 'changed' :
+                statCard.classList.contains('deleted') ? 'deleted' : null;
+
+          if (status) {
+            // Toggle filter
+            if (currentFilter === status) {
+              // Turn off filter
+              currentFilter = null;
+              statCard.classList.remove('active');
+            } else {
+              // Turn on filter
+              currentFilter = status;
+              // Remove active class from all cards
+              document.querySelectorAll('.stat-card').forEach(card => {
+                card.classList.remove('active');
+              });
+              // Add active class to clicked card
+              statCard.classList.add('active');
+            }
+
+            // Re-render components with new filter
+            renderComponents();
+          }
+        }
+      });
+
+      // Component toggle
+      document.addEventListener('click', (e) => {
+        const componentItem = e.target.closest('.component-item');
+        if (componentItem && e.target.closest('.component-header')) {
+          const content = componentItem.querySelector('.component-content');
+          const opening = !content.classList.contains('open');
+          content.classList.toggle('open');
+          componentItem.classList.toggle('open');
+          if (opening) {
+            // Recalculate after layout updates
+            setTimeout(() => recalcComparisonsInElement(componentItem), 0);
+          }
+        }
+      });
+
+      // View toggle for changed components
+      document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('toggle-btn')) {
+          const container = e.target.closest('.component-content');
+          const componentId = container.closest('.component-item').dataset.id;
+          const view = e.target.dataset.view;
+
+          // Update button states
+          container.querySelectorAll('.toggle-btn').forEach((btn) => {
+            btn.classList.remove('active');
+          });
+          e.target.classList.add('active');
+
+          // Show/hide views
+          const sliderView = document.getElementById(`slider-${componentId}`);
+          const diffView = document.getElementById(`diff-${componentId}`);
+
+          if (view === 'slider') {
+            sliderView.classList.remove('hidden');
+            diffView.classList.add('hidden');
+            // Ensure height is correct when switching to slider
+            const cv = sliderView.querySelector('.comparison-view');
+            setTimeout(() => recalcComparisonViewHeight(cv), 0);
+          } else {
+            sliderView.classList.add('hidden');
+            diffView.classList.remove('hidden');
+          }
+        }
+      });
+
+      // Slider functionality
+      document.addEventListener('mousedown', (e) => {
+        const slider = e.target.closest('.comparison-slider');
+        if (!slider) return;
+
+        const comparisonView = slider.closest('.comparison-view');
+        const baselineImg = comparisonView.querySelector('.comparison-image.baseline');
+        const featureImg = comparisonView.querySelector('.comparison-image.feature');
+
+        function moveSlider(e) {
+          const rect = comparisonView.getBoundingClientRect();
+          const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+
+          slider.style.left = x + '%';
+          baselineImg.style.clipPath = `polygon(0 0, ${x}% 0, ${x}% 100%, 0 100%)`;
+          featureImg.style.clipPath = `polygon(${x}% 0, 100% 0, 100% 100%, ${x}% 100%)`;
+        }
+
+        function stopMoving() {
+          document.removeEventListener('mousemove', moveSlider);
+          document.removeEventListener('mouseup', stopMoving);
+        }
+
+        document.addEventListener('mousemove', moveSlider);
+        document.addEventListener('mouseup', stopMoving);
+      });
+
+      // Recalculate on window resize
+      window.addEventListener('resize', () => {
+        document.querySelectorAll('.comparison-view').forEach((view) => recalcComparisonViewHeight(view));
+      });
+    }
+
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', init);
+
+    // Export function to update component diffs from external source
+    window.updateComponentDiffs = function (newDiffs) {
+      componentDiffs.length = 0;
+      componentDiffs.push(...newDiffs);
+      updateSummary();
+      renderComponents();
+      attachEventListeners();
+    };
+  </script>
+</body>
+
+</html>

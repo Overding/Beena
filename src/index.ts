@@ -19,8 +19,6 @@ type ComponentDiff = {
   status: 'ok' | 'added' | 'deleted' | 'changed'
 }
 
-type ComponentCountByStatus = Record<ComponentDiff['status'], number>
-
 const cmd = new Command()
 cmd
   .requiredOption(
@@ -49,7 +47,7 @@ const featureBranch = cmd.opts().featureBranch
 const featureBranchHash = getGitBranchSHA1(featureBranch)
 const screenshotsDirPath = './node_modules/.cache/beena/screenshots'
 const reportDirPath = './node_modules/.cache/beena/reports'
-const diffId = Date.now().toString()
+const jobId = Date.now().toString()
 
 if (fs.existsSync(path.join(process.cwd(), screenshotsDirPath))) {
   fs.rmSync(path.join(process.cwd(), screenshotsDirPath), {
@@ -84,12 +82,12 @@ async function screenshotStorybookByBranch(branch: string): Promise<string[]> {
 }
 
 function createReportDirectory() {
-  const reportDiffDirPath = path.join(process.cwd(), reportDirPath, diffId)
+  const reportDiffDirPath = path.join(process.cwd(), reportDirPath, jobId)
   fs.mkdirSync(reportDiffDirPath, { recursive: true })
 }
 
 function generateReport(componentsDiff: ComponentDiff[]) {
-  const reportPath = path.join(process.cwd(), reportDirPath, `${diffId}.html`)
+  const reportPath = path.join(process.cwd(), reportDirPath, `${jobId}.html`)
 
   Handlebars.registerHelper(
     'ifEquals',
@@ -98,27 +96,20 @@ function generateReport(componentsDiff: ComponentDiff[]) {
     },
   )
 
-  const componentCountByStatus: ComponentCountByStatus = {
-    ok: 0,
-    added: 0,
-    changed: 0,
-    deleted: 0,
-  }
-
-  for (const component of componentsDiff) {
-    componentCountByStatus[component.status]++
-  }
-
-  const template = Handlebars.compile(
-    fs.readFileSync(path.join(getModuleDir(), 'report-template.hbs'), 'utf8'),
-  )
-  const reportContent = template({
-    diffId,
+  const reportConfig = {
+    jobId,
     baselineBranchHash,
     featureBranchHash,
-    componentsDiff,
-    componentCountByStatus,
-  })
+    timestamp: Date.now(),
+  }
+
+  const template = fs.readFileSync(
+    path.join(getModuleDir(), 'report-template.html'),
+    'utf8',
+  )
+  const reportContent = template
+    .replace('{ /* config */ }', JSON.stringify(reportConfig, null, 2))
+    .replace('{ /* componentDiffs */ }', JSON.stringify(componentsDiff))
 
   fs.writeFileSync(reportPath, reportContent)
   console.log('Report has been saved to:', path.resolve(reportPath))
@@ -240,7 +231,7 @@ function getComponentsDiff(
         const diffShotPath = path.join(
           process.cwd(),
           reportDirPath,
-          diffId,
+          jobId,
           `${componentIdDiff.id}.png`,
         )
 
