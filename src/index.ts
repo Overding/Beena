@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url'
 import { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { Command } from 'commander'
 import { chromium } from 'playwright'
-import Handlebars from 'handlebars'
 import { PNG, PNGWithMetadata } from 'pngjs'
 import pixelmatch from 'pixelmatch'
 
@@ -41,9 +40,9 @@ const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 60_000
 const componentExplorerType = 'storybook'
 const componentExplorer = componentExplorers[componentExplorerType]
 
-const baselineBranch = cmd.opts().baselineBranch
+const baselineBranch = cmd.opts().baselineBranch as string
 const baselineBranchHash = getGitBranchSHA1(baselineBranch)
-const featureBranch = cmd.opts().featureBranch
+const featureBranch = cmd.opts().featureBranch as string
 const featureBranchHash = getGitBranchSHA1(featureBranch)
 const screenshotsDirPath = './node_modules/.cache/beena/screenshots'
 const reportDirPath = './node_modules/.cache/beena/reports'
@@ -98,7 +97,9 @@ function generateReport(componentsDiff: ComponentDiff[]) {
 
   const reportConfig = {
     jobId,
+    baselineBranch,
     baselineBranchHash,
+    featureBranch,
     featureBranchHash,
     timestamp: Date.now(),
   }
