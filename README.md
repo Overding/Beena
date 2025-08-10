@@ -1,101 +1,86 @@
 # Beena
 
-Local, privacy‑first visual regression testing for Storybook. Compare a baseline branch to a feature branch, generate a single HTML report, and run identically on your machine or in CI.
+<img title="a title" alt="Alt text" width="100" height="100" style="display: block; margin: 0 0 15px 0" src="./logo.svg">
 
-- License: MIT
-- Status: Actively developed
+Local, fast visual regression testing for your frontend projects. Compare the components of your Storybook in a baseline branch to a feature branch, generate a single HTML report, and run identically on your machine or in CI.
 
 ## Why Beena
 
 - Local and CI‑parity: no cloud dependency, no data upload
 - Cost‑efficient: no SaaS fees or per‑screenshot charges
-- Fast and accurate: parallelized screenshots + pixelmatch diffs
-- Cross‑platform: macOS, Linux, Windows; Storybook v6+
+- Fast and accurate: parallelized runs and accurate diffs
+- Cross‑platform: macOS, Linux, Windows;
+- Supported Component Explorers: Storybook v6+
+
+### Comparison to hosted services
+
+#### **Advantages:**
+
+- No SaaS subscriptions fees
+- No per screenshot fee
+- Offline capable
+
+#### **Trade‑offs:**
+
+- Performance depends on your machine/runner
+- No managed dashboard to view the report
 
 ## Quick Start
 
 - Requirements
-  - Node.js 18+ and npm (or compatible)
-  - Git repo with accessible baseline and feature branches
-  - Storybook v6+ that can build successfully
+  - Node.js 18+
+  - Project should be version controlled by **Git**
   - Playwright (browsers will be installed on first run)
+  - Storybook v6+
+
 - Install and run
+
   ```
   npm i -D beena
   npx beena -b main -f my-feature
   ```
 
-The CLI prints the HTML report path; open it in a browser.
+  - CLI Arguments:
+
+    `-b`, `--baseline-branch` (_required_) Baseline branch name, the reference branch (e.g., `main`).
+
+    `-f`, `--feature-branch` (_required_) Feature branch name. the branch with changes to compare against baseline (e.g. `my-feature`).
+
+The CLI will print the HTML report path which you can copy past and open it in your browser.
 
 Notes:
 
 - Keep your working tree clean (commit or stash) before running.
 - Installing may take longer as Playwright downloads browsers.
 
-## CLI
-
-Basic:
-
-- npx beena -b <baseline-branch> -f <feature-branch>
-
-Flags:
-
-- `-b`, `--baseline-branch` Baseline branch name (required), the reference branch (e.g., main).
-- `-f`, `--feature-branch` Feature branch name (required). the branch with changes to compare against baseline.
-
-Exit codes:
-
-- `0`: Completed without fatal errors. (Diff presence policy may be configurable in future.)
-- `1`: Fatal error (e.g., Storybook build failure, Playwright error).
-
 ## How it works
 
 1. Checks out and builds Storybook for the baseline branch, screenshots each story using Playwright.
 2. Repeats for the feature branch.
 3. Matches stories strictly by Storybook story ID and computes visual diffs with pixelmatch.
-4. Generates a single, standalone HTML report with counts and per‑story views (diff heatmap + slider).
+4. Generates a single, standalone HTML report containing a summary and per‑story views (diff heatmap + slider).
 5. Saves artifacts under node_modules/.cache/beena.
 
-Tech stack:
+### Tech stack:
 
 - Screenshotting: Playwright
 - Diffing: [pixelmatch](https://github.com/mapbox/pixelmatch) (accurate anti-aliased pixels detection and perceptual color difference metrics)
 - Concurrency: automatic parallelization based on available CPU
 
-Defaults (current behavior):
+### Extendible architecture
 
-- Strict match by story ID across branches
-- Automatic parallelization; no manual config required yet
-- A single default viewport/device scale (will become configurable)
-
-## Reports
-
-- Format: single HTML file (plus any required assets if applicable)
-- Location: node_modules/.cache/beena
-- Contents:
-  - Summary: counts of ok / added / changed / deleted stories
-  - Per‑story details: diff heatmap and baseline vs feature slider
-- Usage:
-  - Open locally in a browser
-  - Upload directory as a CI artifact and download/view post‑job
+The integration of Beena with Storybook is decoupled. In fact, it is easy to introduce integration for new component explorer software (similar to Storybook) into Beena. All logic related to component explorers is extracted into `src/component-explorers`. If you need a new integration, please create an issue in the GitHub repo. We are also open to contributions; see the notes below about contributing.
 
 ## CI/CD
 
-Beena runs the same locally and in CI; no special flags.
+Beena runs the same locally and in CI; no special flags needed.
 
 General guidance:
 
 - Use [official Playwright Docker images](https://playwright.dev/docs/docker) for speed and determinism.
 - Ensure the runner has git history to check out both branches.
 - Persist node_modules/.cache/beena as an artifact.
-
-Tip: cache node_modules and Playwright browsers in your CI to reduce cold‑start time.
-
-## Limitations (current)
-
-- Renamed/moved stories appear as added/deleted (strict ID match)
-- No story filtering/subsetting yet
-- No CPU/thread or memory limit controls yet
+- To reduce cold‑start time consider caching node_modules and Playwright browsers in your CI
 
 ## Troubleshooting
 
@@ -112,19 +97,7 @@ Inconsistent renders:
 
 ## Security and privacy
 
-- No screenshots or diffs, usage statistics, or telemetry leave your environment
-- Headless browsers run locally or in your CI; no outbound uploads by Beena
-
-## Comparison to hosted services
-
-Advantages:
-
-- No SaaS fees, offline capable, full data control
-
-Trade‑offs:
-
-- Performance depends on your machine/runner
-- No managed dashboard/cloud storage
+No screenshots or diffs, usage statistics, or telemetry leave your environment. The headless browsers run locally or in your CI; no outbound uploads by Beena.
 
 ## Roadmap
 
@@ -146,3 +119,7 @@ We welcome contributions!
   - Open an issue describing the problem or feature
   - Discuss approach with maintainers
   - Submit a PR referencing the issue
+
+## What is origin of name for the software (Beena)?
+
+In Persian (Farsi) language, the word Beena, or "بینا" (bīnā) means "sighted" or "able to see". It can also carry a figurative meaning of "perceptive" or "insightful", referring to someone who understands things deeply or has good judgment. We thought it can be a good name for a software which is "able to see" the visual regressions.
