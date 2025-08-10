@@ -63,7 +63,6 @@ const componentsDiff = getComponentsDiff(
   baselineBranchComponentIds,
   featureBranchComponentIds,
 )
-console.log({ componentsDiff })
 generateReport(componentsDiff)
 process.exit()
 
@@ -75,7 +74,6 @@ async function screenshotStorybookByBranch(branch: string): Promise<string[]> {
   console.log(`Component explorer is running at http://localhost:${port}`)
   console.log(`Taking screenshots of components…`)
   const ComponentIds = await takeScreenshotsOfStorybook(port, branch)
-  console.log(`Took screenshots of components`)
   childProcess.kill()
   return ComponentIds
 }
@@ -105,7 +103,7 @@ function generateReport(componentsDiff: ComponentDiff[]) {
 
   const reportPath = path.join(process.cwd(), reportDirPath, `${jobId}.html`)
   fs.writeFileSync(reportPath, reportContent)
-  console.log('Report has been saved to:', path.resolve(reportPath))
+  console.log('\n✅ Report has been saved to:', path.resolve(reportPath))
 }
 
 function getModuleDir() {
@@ -377,9 +375,9 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
 
   await browser.close()
   console.log(
-    `It took ${
-      (Date.now() - startTime) / 60000
-    } minutes to to take the screenshots for this branch`,
+    `Done. It took ${((Date.now() - startTime) / 60000).toFixed(
+      2,
+    )} minutes to take the screenshots for this branch`,
   )
   return processedComponentIds
 }

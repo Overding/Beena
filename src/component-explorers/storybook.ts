@@ -58,9 +58,7 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
     .locator('[data-nodetype="component"]')
     .first()
     .waitFor({ state: 'attached' })
-  console.log('sending keyboard shortcut to open the component explorer')
   await page.keyboard.press('ControlOrMeta+Shift+ArrowDown')
-  console.log('sent ControlOrMeta+Shift+ArrowDown')
 
   const storiesLinks = await page.locator('[data-nodetype="story"]').all()
 
