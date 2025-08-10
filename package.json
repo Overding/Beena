@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": "true",
   "type": "module",
-  "license": "UNLICENSED",
-  "main": "sr/index.ts",
+  "license": "MIT",
+  "main": "src/index.ts",
   "bin": "./dist/index.mjs",
   "scripts": {
     "postinstall": "npx playwright install chromium",
