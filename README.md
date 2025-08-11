@@ -2,13 +2,14 @@
 
 <img title="a title" alt="Alt text" width="100" height="100" style="display: block; margin: 0 0 15px 0" src="./logo.svg">
 
-Local, fast visual regression testing for your frontend projects. Compare the components of your Storybook in a baseline branch to a feature branch, generate a single HTML report, and run identically on your machine or in CI.
+Local, fast visual regression testing for your frontend projects with automatic auto-retries. Compare the components of your Storybook in a baseline branch to a feature branch, generate a single HTML report, and run identically on your machine or in CI.
 
 ## Why Beena
 
 - Local and CI‑parity: no cloud dependency, no data upload
 - Cost‑efficient: no SaaS fees or per‑screenshot charges
 - Fast and accurate: parallelized runs and accurate diffs
+- Auto retries: If the component does not load properly, Beena will retry to load it again for two other times automatically to prevent flaky tests.
 - Cross‑platform: macOS, Linux, Windows;
 - Supported Component Explorers: Storybook v6+
 
@@ -68,7 +69,7 @@ Notes:
 
 - Screenshotting: Playwright
 - Diffing: [pixelmatch](https://github.com/mapbox/pixelmatch) (accurate anti-aliased pixels detection and perceptual color difference metrics)
-- Concurrency: automatic parallelization based on available CPU
+- Concurrency: automatic parallelization based on available CPU (By default Beena will use half of the CPU cores)
 
 ### Extendible architecture
 
@@ -106,7 +107,6 @@ No screenshots or diffs, usage statistics, or telemetry leave your environment. 
 
 - Story filtering/subsetting
 - Configurable diff sensitivity
-- Configurable Resource limits (CPU/memory)
 - Auto‑detect baseline/feature from git state
 - Better handling of renamed/moved stories
 - Multiple viewport sizes (desktop/tablet/mobile)
