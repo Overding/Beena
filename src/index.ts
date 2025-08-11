@@ -26,6 +26,7 @@ type ScreenshotJobResult = {
 }
 
 const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 1_500
+const DEFAULT_COMPONENT_RENDER_RETRIES = 2
 const DEFAULT_COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 5_000
 const DEFAULT_WORKERS_COUNT = Math.ceil(os.cpus().length / 2)
 
@@ -42,6 +43,11 @@ cmd
   .option(
     '-t, --timeout <ms>',
     'timeout for component rendering in milliseconds',
+    parseInt,
+  )
+  .option(
+    '-r, --retry <number>',
+    'number of times to retry component rendering on failure',
     parseInt,
   )
   .option(
@@ -69,16 +75,33 @@ const featureBranchHash = getGitBranchSHA1(featureBranch)
 const screenshotsDirPath = './node_modules/.cache/beena/screenshots'
 const reportDirPath = './node_modules/.cache/beena/reports'
 const jobId = Date.now().toString()
-const componentRerenderTimeout = (cmd.opts().timeout ??
-  DEFAULT_COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS) as number
+const componentRerenderTimeout = parseAbsNumericCommandOption(
+  cmd.opts().timeout,
+  DEFAULT_COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS,
+)
 const enableHead = cmd.opts().enableHead ?? (false as boolean)
+const rerenderMaxRetries = parseAbsNumericCommandOption(
+  cmd.opts().retry,
+  DEFAULT_COMPONENT_RENDER_RETRIES,
+)
 
 /** Limit the number of workers to the number of available CPU cores, even if
  * user specifies a higher number */
 const workersCount = Math.min(
-  cmd.opts().workersCount ?? DEFAULT_WORKERS_COUNT,
+  parseAbsNumericCommandOption(cmd.opts().workersCount, DEFAULT_WORKERS_COUNT),
   os.cpus().length,
 )
+
+function parseAbsNumericCommandOption(option: unknown, defaultValue: number) {
+  if (typeof option === 'string') {
+    const parsed = parseInt(option, 10)
+    return isNaN(parsed) ? defaultValue : Math.abs(parsed)
+  }
+  if (typeof option === 'number') {
+    return Math.abs(option)
+  }
+  return defaultValue
+}
 
 if (fs.existsSync(path.join(process.cwd(), screenshotsDirPath))) {
   fs.rmSync(path.join(process.cwd(), screenshotsDirPath), {
@@ -271,8 +294,6 @@ function getComponentsDiff(
         ...baselineBranchScreenshotResult.faultyComponentIds,
         ...featureBranchScreenshotResult.faultyComponentIds,
       ].includes(componentIdDiff.id)
-
-      componentIdDiff.hasErrors = true
     } catch (e) {
       console.log('Error for ', componentIdDiff.id)
       console.log(e)
@@ -396,8 +417,9 @@ async function takeScreenshotsOfComponentExplorer(
         )
       } catch (_error) {
         if (
-          !retriedComponents[componentId] ||
-          retriedComponents[componentId] < 2
+          rerenderMaxRetries > 0 &&
+          (!retriedComponents[componentId] ||
+            retriedComponents[componentId] <= rerenderMaxRetries)
         ) {
           console.warn(
             'will retry the ',
