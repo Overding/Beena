@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { Locator } from 'playwright'
 
 import {
   RunComponentExplorer,
@@ -42,7 +43,8 @@ export const run: RunComponentExplorer = () => {
     childProcess.stderr.setEncoding('utf8')
     childProcess.stderr.on('data', function (_data) {
       // TODO: Verbose mode should enable this console
-      // console.error(data);
+      // Some errors gets hidden while this is not enabled
+      // console.error(_data)
     })
   })
 }
@@ -61,19 +63,20 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   const storiesLinks = await page.locator('[data-nodetype="story"]').all()
 
   const storiesIds = (
-    await Promise.all(
-      storiesLinks.map(
-        (item) =>
-          // In Storybook v6 (some cases in v7) the [data-nodetype="story"] element is a link itself
-          item.getAttribute('href') ??
-          // In Storybook v7+ the [data-nodetype="story"] element is a div which has a link inside it
-          item.locator('a').first().getAttribute('href'),
-      ),
-    )
+    await Promise.all(storiesLinks.map(getStoryLinkByStoryLocator))
   )
     .filter((item) => item !== null)
     .map((item) => item.split('/').pop() as string)
   return storiesIds
+}
+
+async function getStoryLinkByStoryLocator(
+  item: Locator,
+): Promise<string | null> {
+  const possibleStoryLink = await item.getAttribute('href')
+  return possibleStoryLink
+    ? possibleStoryLink
+    : await item.locator('a').first().getAttribute('href')
 }
 
 export const gotoComponentPage: GotoComponentPage = async (
