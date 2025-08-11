@@ -64,7 +64,7 @@ const reportDirPath = './node_modules/.cache/beena/reports'
 const jobId = Date.now().toString()
 const componentRerenderTimeout = (cmd.opts().timeout ??
   DEFAULT_COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS) as number
-const enableHead = cmd.opts()['enable-head'] ?? (false as boolean)
+const enableHead = cmd.opts().enableHead ?? (false as boolean)
 
 /** Limit the number of workers to the number of available CPU cores, even if
  * user specifies a higher number */
