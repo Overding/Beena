@@ -39,8 +39,14 @@ cmd
   )
   .option(
     '--enable-head',
-    'show the browser head while rendering components. Useful for debugging.',
+    'show the browser head while rendering components; Useful for debugging',
     false,
+  )
+  .option(
+    '-w, --workers-count <number>',
+    'number of workers to use to run the jobs in parallel. By default application will use the half of available CPU cores',
+    parseInt,
+    Math.ceil(os.cpus().length / 2),
   )
 
 cmd.parse(process.argv)
@@ -60,6 +66,13 @@ const reportDirPath = './node_modules/.cache/beena/reports'
 const jobId = Date.now().toString()
 const componentRerenderTimeout = cmd.opts().timeout as number
 const enableHead = cmd.opts()['enable-head'] as boolean
+
+/** Limit the number of workers to the number of available CPU cores, even if
+ * user specifies a higher number */
+const workersCount = Math.min(
+  cmd.opts()['workers-count'] as number,
+  os.cpus().length,
+)
 
 if (fs.existsSync(path.join(process.cwd(), screenshotsDirPath))) {
   fs.rmSync(path.join(process.cwd(), screenshotsDirPath), {
@@ -289,7 +302,6 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     baseURL,
   )
 
-  const workersCount = Math.ceil(Math.max(os.cpus().length / 3, 1))
   const componentsPerWorker = Math.ceil(componentIds.length / workersCount)
 
   console.log(
