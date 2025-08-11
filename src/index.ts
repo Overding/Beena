@@ -19,7 +19,8 @@ type ComponentDiff = {
 }
 
 const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 1_500
-const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 5_000
+const DEFAULT_COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 5_000
+const DEFAULT_WORKERS_COUNT = Math.ceil(os.cpus().length / 2)
 
 const cmd = new Command()
 cmd
@@ -35,18 +36,15 @@ cmd
     '-t, --timeout <ms>',
     'timeout for component rendering in milliseconds',
     parseInt,
-    COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS,
   )
   .option(
     '--enable-head',
     'show the browser head while rendering components; Useful for debugging',
-    false,
   )
   .option(
     '-w, --workers-count <number>',
     'number of workers to use to run the jobs in parallel. By default application will use the half of available CPU cores',
     parseInt,
-    Math.ceil(os.cpus().length / 2),
   )
 
 cmd.parse(process.argv)
@@ -64,13 +62,14 @@ const featureBranchHash = getGitBranchSHA1(featureBranch)
 const screenshotsDirPath = './node_modules/.cache/beena/screenshots'
 const reportDirPath = './node_modules/.cache/beena/reports'
 const jobId = Date.now().toString()
-const componentRerenderTimeout = cmd.opts().timeout as number
-const enableHead = cmd.opts()['enable-head'] as boolean
+const componentRerenderTimeout = (cmd.opts().timeout ??
+  DEFAULT_COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS) as number
+const enableHead = cmd.opts()['enable-head'] ?? (false as boolean)
 
 /** Limit the number of workers to the number of available CPU cores, even if
  * user specifies a higher number */
 const workersCount = Math.min(
-  cmd.opts()['workers-count'] as number,
+  cmd.opts().workersCount ?? DEFAULT_WORKERS_COUNT,
   os.cpus().length,
 )
 
