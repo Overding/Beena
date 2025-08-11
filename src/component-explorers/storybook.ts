@@ -54,10 +54,7 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   baseURL,
 ) => {
   await page.goto(baseURL)
-  await page
-    .locator('[data-nodetype="component"]')
-    .first()
-    .waitFor({ state: 'attached' })
+  await page.locator('[data-nodetype]').first().waitFor({ state: 'attached' })
   await page.keyboard.press('ControlOrMeta+Shift+ArrowDown')
 
   const storiesLinks = await page.locator('[data-nodetype="story"]').all()
