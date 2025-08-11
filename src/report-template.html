@@ -213,6 +213,10 @@
       color: #991b1b;
     }
 
+    .error-badge {
+      font-size: 1rem;
+    }
+
     .component-content {
       padding: 0 1.5rem 1.5rem;
       display: none;
@@ -399,10 +403,11 @@
 
     // Sample data - Here is the componentDiffs array sample that can be passed to the template
     // const componentDiffs = [
-    //   { id: 'example-button--large', status: 'deleted' },
-    //   { id: 'example-button--medium', status: 'changed' },
-    //   { id: 'example-button--small', status: 'ok' },
-    //   { id: 'example-button--small-neo', status: 'added' },
+    //   { id: 'example-button--large', status: 'deleted', hasErrors: false },
+    //   { id: 'example-button--medium', status: 'changed', hasErrors: false },
+    //   { id: 'example-button--small', status: 'ok', hasErrors: false },
+    //   { id: 'example-button--small-neo', status: 'added', hasErrors: false },
+    //   { id: 'example-button--medium-new', status: 'changed', hasErrors: true },
     // ];
     const componentDiffs = { /* componentDiffs */ };
 
@@ -493,6 +498,8 @@
       statusBadge.className = `status-badge ${diff.status}`;
       statusBadge.textContent = diff.status;
 
+
+
       const componentId = document.createElement('span');
       componentId.className = 'component-id';
       componentId.textContent = diff.id;
@@ -505,6 +512,14 @@
       info.appendChild(componentId);
       header.appendChild(info);
       header.appendChild(chevron);
+
+      if (diff.hasErrors) {
+        const errorBadge = document.createElement('span');
+        errorBadge.className = `error-badge`;
+        errorBadge.textContent = '⚠️';
+        errorBadge.setAttribute('title', 'This component had errors while rendering.');
+        info.appendChild(errorBadge);
+      }
 
       return header;
     }

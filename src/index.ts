@@ -16,6 +16,13 @@ import * as componentExplorers from './component-explorers/index.js'
 type ComponentDiff = {
   id: string
   status: 'ok' | 'added' | 'deleted' | 'changed'
+  hasErrors?: boolean
+}
+
+type ScreenshotJobResult = {
+  successfulComponentIds: string[]
+  faultyComponentIds: string[]
+  retriedComponentIds: string[]
 }
 
 const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 1_500
@@ -79,28 +86,28 @@ if (fs.existsSync(path.join(process.cwd(), screenshotsDirPath))) {
   })
 }
 
-const baselineBranchComponentIds =
+const baselineBranchScreenshotJobResult =
   await screenshotStorybookByBranch(baselineBranch)
-const featureBranchComponentIds =
+const featureBranchScreenshotJobResult =
   await screenshotStorybookByBranch(featureBranch)
 createReportDirectory()
 const componentsDiff = getComponentsDiff(
-  baselineBranchComponentIds,
-  featureBranchComponentIds,
+  baselineBranchScreenshotJobResult,
+  featureBranchScreenshotJobResult,
 )
 generateReport(componentsDiff)
 process.exit()
 
-async function screenshotStorybookByBranch(branch: string): Promise<string[]> {
+async function screenshotStorybookByBranch(branch: string) {
   checkoutGitBranch(branch)
   console.log(`Starting up the component explorer (${componentExplorerType})… `)
   const { port, childProcess } = await componentExplorer.run()
   childProcesses.push(childProcess)
   console.log(`Component explorer is running at http://localhost:${port}`)
   console.log(`Taking screenshots of components…`)
-  const ComponentIds = await takeScreenshotsOfStorybook(port, branch)
+  const result = await takeScreenshotsOfComponentExplorer(port, branch)
   childProcess.kill()
-  return ComponentIds
+  return result
 }
 
 function createReportDirectory() {
@@ -137,12 +144,18 @@ function getModuleDir() {
 }
 
 function getComponentsDiff(
-  baselineBranchComponentIds: string[],
-  featureBranchComponentIds: string[],
+  baselineBranchScreenshotResult: ScreenshotJobResult,
+  featureBranchScreenshotResult: ScreenshotJobResult,
 ): ComponentDiff[] {
   const componentIdsDiff = getComponentIdsDiff(
-    baselineBranchComponentIds,
-    featureBranchComponentIds,
+    [
+      ...baselineBranchScreenshotResult.successfulComponentIds,
+      ...baselineBranchScreenshotResult.faultyComponentIds,
+    ],
+    [
+      ...featureBranchScreenshotResult.successfulComponentIds,
+      ...featureBranchScreenshotResult.faultyComponentIds,
+    ],
   )
   for (const componentIdDiff of componentIdsDiff) {
     if (componentIdDiff.status !== 'ok') {
@@ -253,6 +266,13 @@ function getComponentsDiff(
 
         fs.writeFileSync(diffShotPath, PNG.sync.write(diff))
       }
+
+      componentIdDiff.hasErrors = [
+        ...baselineBranchScreenshotResult.faultyComponentIds,
+        ...featureBranchScreenshotResult.faultyComponentIds,
+      ].includes(componentIdDiff.id)
+
+      componentIdDiff.hasErrors = true
     } catch (e) {
       console.log('Error for ', componentIdDiff.id)
       console.log(e)
@@ -287,7 +307,10 @@ function getComponentIdsDiff(
   return componentsDiff
 }
 
-async function takeScreenshotsOfStorybook(port: number, branchName: string) {
+async function takeScreenshotsOfComponentExplorer(
+  port: number,
+  branchName: string,
+): Promise<ScreenshotJobResult> {
   const startTime = Date.now()
   console.log('taking screenshots for', branchName, 'branch.')
   const browser = await chromium.launch({
@@ -307,9 +330,9 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     `using ${workersCount} worker(s). components per worker: ${componentsPerWorker}`,
   )
 
-  const workerProcesses = []
+  const workerJobs = []
   for (let workerIndex = 0; workerIndex < workersCount; workerIndex++) {
-    workerProcesses.push(
+    workerJobs.push(
       doWork(
         workerIndex * componentsPerWorker,
         Math.min((workerIndex + 1) * componentsPerWorker, componentIds.length),
@@ -318,19 +341,42 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
     )
   }
 
-  const processedComponentIds = (await Promise.all(workerProcesses)).reduce(
-    (acc, current) => acc.concat(current),
-    [],
+  const accumulatedJobsResult = (await Promise.all(workerJobs)).reduce(
+    (acc, current) => {
+      acc.successfulComponentIds = acc.successfulComponentIds.concat(
+        current.successfulComponentIds,
+      )
+      acc.faultyComponentIds = acc.faultyComponentIds.concat(
+        current.faultyComponentIds,
+      )
+      acc.retriedComponentIds = acc.retriedComponentIds.concat(
+        current.retriedComponentIds,
+      )
+      return acc
+    },
+    {
+      successfulComponentIds: [],
+      faultyComponentIds: [],
+      retriedComponentIds: [],
+    },
   )
 
   async function doWork(
     startIndex: number,
     endIndex: number,
     _workerIndex: number,
-  ) {
+  ): Promise<ScreenshotJobResult> {
     const workerPage = await browser.newPage()
-    const workerComponentIds = []
 
+    /** components which we successfully took the screenshot of them */
+    const successfulComponentIds = []
+
+    /** components which we could not take the screenshot of them because of an
+     * error on the component rendering or timeout */
+    const faultyComponentIds = []
+
+    /** flaky components which we successfully took the screenshot of them after
+     * some retries */
     const retriedComponents: Record<string, number> = {}
 
     for (let i = startIndex; i < endIndex; i++) {
@@ -373,6 +419,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
             fullPage: true,
             animations: 'disabled',
           })
+          faultyComponentIds.push(componentId)
           continue
         }
       }
@@ -391,10 +438,16 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         animations: 'disabled',
       })
 
-      workerComponentIds.push(componentId)
+      successfulComponentIds.push(componentId)
     }
 
-    return workerComponentIds
+    const retriedComponentIds = Object.keys(retriedComponents)
+
+    return {
+      successfulComponentIds,
+      faultyComponentIds,
+      retriedComponentIds,
+    }
   }
 
   await browser.close()
@@ -403,5 +456,6 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
       2,
     )} minutes to take the screenshots for this branch`,
   )
-  return processedComponentIds
+
+  return accumulatedJobsResult
 }
