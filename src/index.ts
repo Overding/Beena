@@ -34,8 +34,8 @@ cmd.parse(process.argv)
 const childProcesses: ChildProcessWithoutNullStreams[] = []
 setupProcessCleanUponExit(childProcesses)
 
-const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 30_000
-const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 60_000
+const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 2_500
+const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 5_000
 
 const componentExplorerType = 'storybook'
 const componentExplorer = componentExplorers[componentExplorerType]
@@ -327,7 +327,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
       } catch (_error) {
         if (
           !retriedComponents[componentId] ||
-          retriedComponents[componentId] < 3
+          retriedComponents[componentId] < 2
         ) {
           console.warn(
             'will retry the ',
