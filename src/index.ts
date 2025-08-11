@@ -18,6 +18,9 @@ type ComponentDiff = {
   status: 'ok' | 'added' | 'deleted' | 'changed'
 }
 
+const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 1_500
+const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 5_000
+
 const cmd = new Command()
 cmd
   .requiredOption(
@@ -28,14 +31,22 @@ cmd
     '-f, --feature-branch <name>',
     'feature branch name such as feat/awesome-feature',
   )
+  .option(
+    '-t, --timeout <ms>',
+    'timeout for component rendering in milliseconds',
+    parseInt,
+    COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS,
+  )
+  .option(
+    '--enable-head',
+    'show the browser head while rendering components. Useful for debugging.',
+    false,
+  )
 
 cmd.parse(process.argv)
 
 const childProcesses: ChildProcessWithoutNullStreams[] = []
 setupProcessCleanUponExit(childProcesses)
-
-const COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS = 2_500
-const COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS = 5_000
 
 const componentExplorerType = 'storybook'
 const componentExplorer = componentExplorers[componentExplorerType]
@@ -47,6 +58,8 @@ const featureBranchHash = getGitBranchSHA1(featureBranch)
 const screenshotsDirPath = './node_modules/.cache/beena/screenshots'
 const reportDirPath = './node_modules/.cache/beena/reports'
 const jobId = Date.now().toString()
+const componentRerenderTimeout = cmd.opts().timeout as number
+const enableHead = cmd.opts()['enable-head'] as boolean
 
 if (fs.existsSync(path.join(process.cwd(), screenshotsDirPath))) {
   fs.rmSync(path.join(process.cwd(), screenshotsDirPath), {
@@ -266,7 +279,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
   const startTime = Date.now()
   console.log('taking screenshots for', branchName, 'branch.')
   const browser = await chromium.launch({
-    headless: true,
+    headless: !enableHead,
   })
   const page = await browser.newPage()
   const baseURL = `http://localhost:${port}`
@@ -316,7 +329,7 @@ async function takeScreenshotsOfStorybook(port: number, branchName: string) {
         const timeout =
           (retriedComponents[componentId] ?? 0) === 0
             ? COMPONENT_RENDER_FIRST_TRY_TIMEOUT_IN_MS
-            : COMPONENT_RENDER_SECOND_TRY_TIMEOUT_IN_MS
+            : componentRerenderTimeout
 
         await componentExplorer.gotoComponentPage(
           workerPage,
