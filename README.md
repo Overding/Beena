@@ -40,16 +40,14 @@ Local, fast visual regression testing for your frontend projects. Compare the co
   npx beena -b main -f my-feature
   ```
 
-  - CLI Arguments:
-
-    `-h`, `--help` display help for command.
-    `-b`, `--baseline-branch` (_required_) Baseline branch name, the reference branch (e.g., `main`).
-
-    `-f`, `--feature-branch` (_required_) Feature branch name. the branch with changes to compare against baseline (e.g. `my-feature`).
-    `-t`, `--timeout <ms>` (_optional_) Timeout in milliseconds for component rendering in milliseconds.
-    `-r`, `--retry` (_optional_) Number of times to retry component rendering on failure.
-    `--enable-head` (_optional_) Show the browser head while rendering components; Useful for debugging.
-    `-w`, `--workers-count` (_optional_) number of workers to use to run the jobs in parallel. By default application will use the half of available CPU cores.
+  - **Available CLI arguments**:
+    - `-h`, `--help` display help for CLI of Beena.
+    - `-b`, `--baseline-branch <string>` (_required_) Baseline branch name, the reference branch (e.g., `main`).
+    - `-f`, `--feature-branch <string>` (_required_) Feature branch name. the branch with changes to compare against baseline (e.g. `my-feature`).
+    - `-t`, `--timeout <ms>` (_optional_) Timeout in milliseconds for component rendering in milliseconds.
+    - `-r`, `--retry <number>` (_optional_) Number of times to retry component rendering on failure.
+    - `--enable-head` (_optional_) Show the browser head while rendering components; Useful for debugging.
+    - `-w`, `--workers-count <number>` (_optional_) number of workers to use to run the jobs in parallel. By default application will use the half of available CPU cores.
 
 The CLI will print the HTML report path which you can copy past and open it in your browser.
 
