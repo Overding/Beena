@@ -51,8 +51,6 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
   page,
   baseURL,
 ) => {
-  const majorVersion = getStorybookMajorVersion()
-
   await page.goto(baseURL)
   await page
     .locator('[data-nodetype="component"]')
@@ -64,10 +62,12 @@ export const getComponentIdsInPage: GetComponentIdsInPage = async (
 
   const storiesIds = (
     await Promise.all(
-      storiesLinks.map((item) =>
-        majorVersion >= 7
-          ? item.locator('a').first().getAttribute('href')
-          : item.getAttribute('href'),
+      storiesLinks.map(
+        (item) =>
+          // In Storybook v6 (some cases in v7) the [data-nodetype="story"] element is a link itself
+          item.getAttribute('href') ??
+          // In Storybook v7+ the [data-nodetype="story"] element is a div which has a link inside it
+          item.locator('a').first().getAttribute('href'),
       ),
     )
   )
